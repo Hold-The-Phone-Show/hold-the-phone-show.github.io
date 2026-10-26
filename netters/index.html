@@ -60,6 +60,24 @@
   footer { margin-top: 36px; border-top: 1px solid var(--line); padding-top: 14px; }
   .empty { color: var(--muted); }
   .other a { color: var(--fg); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--accent); }
+  .up { display: grid; gap: 14px; }
+  .game { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .game-h { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; margin-bottom: 10px; }
+  .game-h strong { font-family: var(--display); font-weight: 400; font-size: 30px; text-transform: uppercase; letter-spacing: .5px; }
+  .game-h span { color: var(--muted); font-weight: 700; font-size: 13px; letter-spacing: .6px; }
+  .line { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .line span { background: var(--panel2); border-radius: 6px; padding: 3px 9px; font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .line span small { color: var(--muted); font-weight: 600; margin-right: 4px; }
+  .pk { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+  .pk b { font-size: 17px; } .pk em { font-style: normal; color: var(--muted); font-size: 13px; grid-column: 1; }
+  .pk .pay { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-family: var(--display); font-size: 22px; color: var(--ok); }
+  .pk.main b { font-size: 20px; } .pk.main { border-top: 0; }
+  .pk.lean b { font-size: 15px; color: var(--muted); }
+  .game .facts { margin-top: 12px; }
+  .slate { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 8px; }
+  .sg { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .sg div { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; } .sg div small { color: var(--muted); font-weight: 600; }
+  .sg p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
 </style>
 </head>
 <body>
@@ -82,14 +100,39 @@ fetch('data.json', { cache: 'no-store' }).then((r) => r.json()).then((d) => { D 
 window.addEventListener('hashchange', route);
 function tabs(cur) {
   const nav = $('#tabs'); nav.replaceChildren();
-  const add = (href, label, sub) => { const a = el('a', null, label); a.href = href; if (sub) a.append(el('small', null, sub)); if (href === '#' + cur || (cur === 'season' && href === '#season')) a.setAttribute('aria-current', 'page'); nav.append(a); };
+  const add = (href, label, sub) => { const a = el('a', null, label); a.href = href; if (sub) a.append(el('small', null, sub)); if (href === '#' + cur) a.setAttribute('aria-current', 'page'); nav.append(a); };
+  if (D.upcoming) add('#upcoming', 'Upcoming', (D.upcoming.games || []).length ? (D.upcoming.games.reduce((n, g) => n + g.picks.filter((p) => !p.lean).length, 0) + ' picks') : '');
   add('#season', 'Season'); [...D.weeks].reverse().forEach((w) => add('#week-' + w.week, w.label, w.record));
 }
 function route() {
-  if (!D) return; const h = location.hash.slice(1), w = D.weeks.find((x) => 'week-' + x.week === h);
-  tabs(w ? h : 'season'); const v = $('#view'); v.replaceChildren(); (w ? week(w) : season()).forEach((n) => v.append(n)); window.scrollTo({ top: 0 });
+  if (!D) return; let h = location.hash.slice(1); const w = D.weeks.find((x) => 'week-' + x.week === h);
+  if (!w && h !== 'season') h = D.upcoming ? 'upcoming' : 'season';   // the site opens on what's coming up
+  tabs(w ? h : h); const v = $('#view'); v.replaceChildren(); (w ? week(w) : h === 'upcoming' ? upcoming() : season()).forEach((n) => v.append(n)); window.scrollTo({ top: 0 });
 }
 function factsBlock(F) { const f = el('div', 'facts'); F.forEach((x) => { const d = el('div', 'lt'); d.append(el('span', null, x.tag), el('p', null, x.text)); f.append(d); }); return f; }
+function upcoming() {
+  const U = D.upcoming || {}, out = [];
+  U.games = (U.games || []).filter((g) => g.picks.some((p) => !p.lean));
+  out.push(el('h2', null, U.games.length ? 'On the board' : 'Next picks drop soon'));
+  if (!(U.games || []).length) out.push(el('p', 'empty', "No picks are out for upcoming games yet. Early Week Leans drop Tuesday, Thursday Night picks Thursday, and Sunday Best Bets Friday."));
+  const up = el('div', 'up');
+  (U.games || []).forEach((g) => {
+    const c = el('div', 'game'), h = el('div', 'game-h'); h.append(el('strong', null, `${g.away} @ ${g.home}`), el('span', null, g.kickoff)); c.append(h);
+    const ln = el('div', 'line'), chip = (k, v) => { const s = el('span'); s.append(el('small', null, k), document.createTextNode(v)); ln.append(s); };
+    if (g.spread) { chip(g.away_abbr, g.spread[0]); chip(g.home_abbr, g.spread[1]); } if (g.total) chip('O/U', g.total);
+    const winning = (v) => { const [w, l] = split(v); return w > l; };   // public page: only the records that are winning
+    Object.entries(g.us || {}).filter(([, v]) => winning(v)).forEach(([k, v]) => chip('Us on the ' + k, v)); chip('Odds', 'BetMGM'); c.append(ln);
+    g.picks.filter((p) => !p.lean).forEach((p, i) => { const r = el('div', 'pk' + (p.lean ? ' lean' : i === 0 && p.bet === 'Game Pick' ? ' main' : ''));
+      r.append(el('b', null, p.legs.join(' + ')), el('em', null, `${p.bet} · ${p.show}`)); if (p.payout) r.append(el('span', 'pay', p.payout.split(' ')[0])); c.append(r); });
+    if ((g.facts || []).length) c.append(factsBlock(g.facts));
+    up.append(c); });
+  out.push(up);
+  if ((U.slate || []).length) { out.push(el('h2', null, 'Also on the slate')); const sl = el('div', 'slate');
+    U.slate.forEach((g) => { const c = el('div', 'sg'), a = el('div'), b = el('div'); a.append(document.createTextNode(`${g.away} ${g.spread ? g.spread[0] : ''}`), el('small', null, g.us && g.us[g.away] && split(g.us[g.away])[0] > split(g.us[g.away])[1] ? 'us ' + g.us[g.away] : ''));
+      b.append(document.createTextNode(`${g.home} ${g.spread ? g.spread[1] : ''}`), el('small', null, g.us && g.us[g.home] && split(g.us[g.home])[0] > split(g.us[g.home])[1] ? 'us ' + g.us[g.home] : '')); c.append(a, b, el('p', null, `${g.kickoff}${g.total ? ' · O/U ' + g.total : ''} · BetMGM`)); sl.append(c); });
+    out.push(sl, el('p', 'note', '"us" = Hold The Phone\'s record picking that team this season (a push counts as a win).')); }
+  return out;
+}
 function season() {
   const out = [];
   if ((D.facts || []).length) out.push(el('h2', null, 'Hot streaks'), factsBlock(D.facts));
