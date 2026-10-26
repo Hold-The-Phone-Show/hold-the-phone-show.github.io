@@ -42,8 +42,7 @@
   .wk { display: grid; grid-template-columns: minmax(110px, 160px) 1fr auto; gap: 12px; align-items: center; text-decoration: none; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
   .wk:hover { border-color: var(--muted); }
   .wk strong { font-weight: 800; } .wk em { font-style: normal; color: var(--muted); font-size: 13px; display: block; }
-  .wk .meter { height: 10px; border-radius: 5px; background: var(--panel2); overflow: hidden; display: flex; }
-  .wk .meter i { display: block; height: 100%; background: var(--ok); } .wk .meter u { display: block; height: 100%; background: var(--bad); opacity: .55; }
+  .wk .hitsline { color: var(--ok); font-weight: 800; }
   .wk b { font-family: var(--display); font-weight: 400; font-size: 26px; font-variant-numeric: tabular-nums; }
   .tw { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
   table { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
@@ -95,14 +94,14 @@
 const $ = (s) => document.querySelector(s), el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
 const split = (r) => r.split('-').map(Number), pct = (r) => { const [w, l] = split(r); return w + l ? Math.round((100 * w) / (w + l)) : 0; };
 let D = null;
-fetch('data.json', { cache: 'no-store' }).then((r) => r.json()).then((d) => { D = d; $('#rec').textContent = d.record; $('#recsub').textContent = `Season record · ${pct(d.record)}%`;
+fetch('data.json', { cache: 'no-store' }).then((r) => r.json()).then((d) => { D = d; $('#rec').textContent = d.record || ''; $('#recsub').textContent = d.record ? `Season record · ${pct(d.record)}%` : '';
   $('#upd').textContent = 'Updated ' + d.updated; route(); }).catch(() => { $('#view').innerHTML = '<p class="empty">Could not load the picks. Try again in a minute.</p>'; });
 window.addEventListener('hashchange', route);
 function tabs(cur) {
   const nav = $('#tabs'); nav.replaceChildren();
   const add = (href, label, sub) => { const a = el('a', null, label); a.href = href; if (sub) a.append(el('small', null, sub)); if (href === '#' + cur) a.setAttribute('aria-current', 'page'); nav.append(a); };
   if (D.upcoming) add('#upcoming', 'Upcoming', (D.upcoming.games || []).length ? (D.upcoming.games.reduce((n, g) => n + g.picks.filter((p) => !p.lean).length, 0) + ' picks') : '');
-  add('#season', 'Season'); [...D.weeks].reverse().forEach((w) => add('#week-' + w.week, w.label, w.record));
+  add('#season', 'Season'); [...D.weeks].reverse().forEach((w) => add('#week-' + w.week, w.label, w.record || `${w.hits} hits`));
 }
 function route() {
   if (!D) return; let h = location.hash.slice(1); const w = D.weeks.find((x) => 'week-' + x.week === h);
@@ -140,24 +139,27 @@ function season() {
   const g = el('div', 'grid'); D.groups.forEach((x) => { const [w, l] = split(x.record); const c = el('div', 'card' + (w > l ? ' win' : '')); c.append(el('div', 'k', x.name), el('b', null, x.record), el('small', null, x.sub)); g.append(c); }); out.push(g);
   if ((D.biggest || []).length) { out.push(el('h2', null, 'Biggest cashes')); const c = el('div', 'cash'); D.biggest.forEach((b) => { const d = el('div'); d.append(el('strong', null, `${b.label} ${b.price}`), el('small', null, b.show)); c.append(d); }); out.push(c); }
   out.push(el('h2', null, 'Week by week'));
-  const ws = el('div', 'weeks'); [...D.weeks].reverse().forEach((w) => { const [W, L] = split(w.record), a = el('a', 'wk'); a.href = '#week-' + w.week;
-    const t = el('div'); t.append(el('strong', null, w.label), el('em', null, w.range)); const m = el('div', 'meter'), i = el('i'), u = el('u');
-    i.style.width = (W + L ? (100 * W) / (W + L) : 0) + '%'; u.style.width = (W + L ? (100 * L) / (W + L) : 0) + '%'; m.append(i, u); a.append(t, m, el('b', null, w.record)); ws.append(a); }); out.push(ws);
+  const ws = el('div', 'weeks'); [...D.weeks].reverse().forEach((w) => { const a = el('a', 'wk'); a.href = '#week-' + w.week;
+    const t = el('div'); t.append(el('strong', null, w.label), el('em', null, w.range));
+    const m = el('div', 'hitsline', [`${w.hits} hits`, w.ncash ? `${w.ncash} cashes` : ''].filter(Boolean).join('  ·  '));
+    a.append(t, m, el('b', null, w.record || '')); ws.append(a); }); out.push(ws);
   return out;
 }
 function week(w) {
   const out = [el('h2', null, `${w.label} · ${w.range}`)];
   const g = el('div', 'grid'), byShow = {};
   w.picks.forEach((p) => { (byShow[p.show] = byShow[p.show] || []).push(p); });
-  Object.entries(byShow).forEach(([s, P]) => { const W = P.filter((p) => p.result === 'Win').length, L = P.filter((p) => p.result === 'Loss').length;
-    const c = el('div', 'card' + (W > L ? ' win' : '')); c.append(el('div', 'k', s), el('b', null, `${W}-${L}`), el('small', null, `${P.length} pick${P.length === 1 ? '' : 's'}` + (P.some((p) => p.result === 'Pending') ? ' · some still to play' : ''))); g.append(c); });
+  if (w.record) { const c = el('div', 'card win'); c.append(el('div', 'k', 'Week record'), el('b', null, w.record), el('small', null, 'game picks')); g.append(c); }
+  Object.entries(byShow).forEach(([s, P]) => { const H = P.filter((p) => p.result === 'Win').length; if (!H) return;
+    const c = el('div', 'card win'); c.append(el('div', 'k', s), el('b', null, String(H)), el('small', null, H === 1 ? 'hit' : 'hits')); g.append(c); });
+  if (w.ncash) { const c = el('div', 'card win'); c.append(el('div', 'k', 'Cashed'), el('b', null, String(w.ncash)), el('small', null, 'more tickets')); g.append(c); }
   const tbl = (P) => { const tw = el('div', 'tw'), t = el('table'), hr = el('tr'); ['Day', 'Show', 'Pick', 'Result', ''].forEach((h) => hr.append(el('th', null, h))); t.append(hr);
     P.forEach((p) => { const tr = el('tr'); tr.append(el('td', null, new Date(p.day + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })),
       el('td', null, p.show), el('td', null, p.pick + (p.game ? '  ·  ' + p.game : ''))); const td = el('td'); td.append(el('span', 'pill ' + p.result, p.result)); tr.append(td, el('td', 'f', p.final || '')); t.append(tr); });
     tw.append(t); return tw; };
   const main = w.picks.filter((p) => p.type !== 'EWL'), leans = w.picks.filter((p) => p.type === 'EWL');   // leans have their own record: their own table, after the show's picks
-  out.push(g, el('h2', null, 'Every pick'), tbl(main));
-  if (leans.length) out.push(el('h2', null, 'Early Week Leans'), tbl([...leans].sort((a, b) => (a.result === b.result ? 0 : a.result === 'Win' ? -1 : b.result === 'Win' ? 1 : a.result === 'Pending' ? 1 : -1))));
+  out.push(g, el('h2', null, 'Every hit'), tbl(main));
+  if (leans.length) out.push(el('h2', null, 'Early Week Leans that hit'), tbl(leans));
   if ((w.cashes || []).length) { out.push(el('h2', null, 'What else cashed')); const c = el('div', 'cash');
     w.cashes.forEach((x) => { const d = el('div'); d.append(el('strong', null, `${x.bet}${x.payout ? ' · ' + x.payout : ''}`), el('small', null, `${x.legs} · ${x.show}`)); c.append(d); }); out.push(c); }
   return out;
