@@ -1,0 +1,635 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hold The Phone · Board</title><meta http-equiv="refresh" content="300">
+<style>
+  /* 10-foot board: scores left, pick tracker right. Everything sized in vh so any TV resolution fills edge to edge. */
+  :root { --navy:#1c2c7c; --red:#ce0e29; --gold:#f2b705; --bg:#070a1c; --panel:#10163a; --line:#26307a; --fg:#f4f6ff; --muted:#9aa3d6;
+          --ok:#18c964; --bad:#ff4d5e; --warn:#f2b705; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
+               font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  .wrap { height:1080px; display:grid; grid-template-rows:97.2px 1fr; }
+  header { display:flex; align-items:center; gap:21.6px; padding:0 32.4px; background:linear-gradient(90deg,var(--navy),#0b1240 60%,var(--red)); }
+  .logo { font-weight:900; font-size:47.52px; letter-spacing:-0.54px; text-transform:uppercase; line-height:.9; }
+  .logo b { color:var(--red); background:#fff; padding:0 6.48px; border-radius:5.4px; margin-left:4.32px; }
+  .hdr-mid { font-size:25.92px; color:#dfe4ff; letter-spacing:2.16px; text-transform:uppercase; }
+  .clock { margin-left:auto; font-size:36.72px; font-weight:700; font-variant-numeric:tabular-nums; }
+  main { display:grid; grid-template-columns:57fr 43fr; gap:21.6px; padding:21.6px 27px 27px; min-height:0; }
+  body.v-scores main { grid-template-columns:1fr; } body.v-scores #picks { display:none; }
+  body.v-picks main { grid-template-columns:1fr; } body.v-picks #scores { display:none; }
+  h2 { font-size:22.68px; letter-spacing:3.78px; text-transform:uppercase; color:var(--muted); margin-bottom:12.96px; font-weight:700; }
+  #scores { min-height:0; display:flex; flex-direction:column; }
+  .games { display:grid; grid-template-columns:repeat(2,1fr); gap:14.04px; align-content:start; overflow:hidden; flex:1; }
+  body.v-scores .games { grid-template-columns:repeat(3,1fr); }
+  .g { background:var(--panel); border:2.7px solid var(--line); border-radius:15.12px; padding:11.88px 16.2px; display:grid; gap:5.4px; position:relative; }
+  .g.live { border-color:#4a5bd6; } .g.rz .st .live::after { content:"  RED ZONE"; color:var(--red); }
+  .row { display:grid; grid-template-columns:54px 1fr auto; align-items:center; gap:12.96px; }
+  .row img { width:54px; height:54px; object-fit:contain; }
+  .tm { font-size:32.4px; font-weight:800; letter-spacing:1.08px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tm small { font-size:18.36px; color:var(--muted); font-weight:600; margin-left:8.64px; }
+  .sc { font-size:45.36px; font-weight:900; font-variant-numeric:tabular-nums; min-width:64.8px; text-align:right; }
+  .row.lose .tm, .row.lose .sc { opacity:.45; }
+  .pos::after { content:""; display:inline-block; width:11.88px; height:11.88px; border-radius:50%; background:var(--gold); margin-left:10.8px; vertical-align:3.78px; }
+  .st { display:flex; justify-content:space-between; gap:10.8px; font-size:20.52px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:1.08px; }
+  .st .live { color:#fff; } .st .live::before { content:"● "; color:var(--red); }
+  .chips { display:flex; flex-wrap:wrap; gap:6.48px; }
+  .chip { font-size:18.36px; font-weight:800; padding:3.24px 9.72px; border-radius:6.48px; background:#2a3480; color:#fff; letter-spacing:0.54px; }
+  .chip.Win { background:var(--ok); color:#04220f; } .chip.Loss { background:#5b1620; color:#ffc7cc; text-decoration:line-through; } .chip.Push { background:#555; }
+  #picks { min-height:0; display:flex; flex-direction:column; gap:17.28px; }
+  .people { display:grid; grid-template-columns:repeat(3,1fr); gap:10.8px; }
+  .p { border-radius:12.96px; padding:10.8px 14.04px; background:var(--navy); display:grid; gap:2.16px; }
+  .p.HTP { grid-column:1 / -1; background:linear-gradient(120deg,var(--navy) 0 55%,var(--red) 55%); padding:14.04px 21.6px;
+           display:flex; align-items:center; justify-content:space-between; }
+  .p.Danny { background:var(--red); } .p.Loops { background:var(--gold); color:var(--navy); } .p.Team, .p.Caller { background:var(--panel); border:2.16px solid var(--line); }
+  .p .nm { font-size:18.36px; font-weight:800; letter-spacing:2.7px; text-transform:uppercase; opacity:.9; }
+  .p .big { font-size:54px; font-weight:900; line-height:1; font-variant-numeric:tabular-nums; }
+  .p.HTP .big { font-size:81px; } .p.HTP .nm { font-size:28.08px; }
+  .p .sub { font-size:17.28px; font-weight:600; opacity:.85; font-variant-numeric:tabular-nums; }
+  .tix-box { flex:1; min-height:0; overflow:hidden; position:relative; }
+  .tix { display:grid; gap:9.72px; }
+  .t { background:var(--panel); border:2.16px solid var(--line); border-left:9.72px solid #3a49b8; border-radius:10.8px; padding:9.72px 14.04px; display:grid; gap:5.4px; }
+  .t.CASHED { border-left-color:var(--ok); background:#0c2a1f; } .t.LOST { border-left-color:#5b1620; opacity:.6; } .t.PUSH { border-left-color:var(--warn); }
+  .th { display:flex; align-items:center; gap:10.8px; }
+  .th .lbl { font-size:24.84px; font-weight:800; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tag { font-size:15.12px; font-weight:900; letter-spacing:1.62px; padding:2.7px 7.56px; border-radius:5.4px; background:var(--navy); text-transform:uppercase; }
+  .tag.Danny { background:var(--red); } .tag.Loops { background:var(--gold); color:var(--navy); } .tag.HTP { background:linear-gradient(90deg,var(--navy),var(--red)); }
+  .tag.Team { background:#fff; color:var(--navy); } .tag.Caller { background:#3b4280; }
+  .pill { font-size:17.28px; font-weight:900; letter-spacing:1.62px; padding:3.24px 9.72px; border-radius:1069.2px; border:2.7px solid currentColor; }
+  .pill.CASHED { color:var(--ok); } .pill.LOST { color:var(--bad); } .pill.OPEN { color:var(--muted); } .pill.PUSH { color:var(--warn); }
+  .legs { display:flex; flex-wrap:wrap; gap:5.4px; }
+  .leg { font-size:17.28px; font-weight:700; padding:2.7px 7.56px; border-radius:5.4px; background:#1d2560; color:#dfe4ff; }
+  .leg.Win { background:var(--ok); color:#04220f; } .leg.Loss { background:#5b1620; color:#ffb3ba; text-decoration:line-through; } .leg.Push { background:#555; }
+  .empty { color:var(--muted); font-size:23.76px; padding:21.6px 0; }
+  .ticker { position:fixed; left:0; right:0; bottom:0; height:0; }
+
+  /* records pane: every record on one screen (snapshots + website; not in the TV rotation) */
+  #records { display:none; min-height:0; flex-direction:column; gap:17.28px; }
+  body.v-rotate.pane-records #picks { display:none; } body.v-rotate.pane-records #records { display:flex; }
+  .r-top { display:grid; grid-template-columns:2fr 1fr 1fr; gap:17.28px; }
+  .r-top > div, .r-grid > div { background:var(--panel); border:3.24px solid var(--line); border-radius:17.28px; padding:15.12px 23.76px; }
+  .r-top .main { background:linear-gradient(90deg,var(--navy),#0b1240); border-color:var(--gold); }
+  .r-top .nm, .r-grid .nm { font-size:28.08px; font-weight:800; letter-spacing:1.08px; text-transform:uppercase; color:var(--muted); }
+  .r-top .main .nm { color:var(--gold); font-size:34.56px; }
+  .r-top .big { font-size:81px; font-weight:900; line-height:1.05; } .r-top .main .big { font-size:118.8px; }
+  .r-top .sub, .r-grid .sub { font-size:21.6px; color:var(--muted); }
+  .r-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:15.12px; }
+  .r-grid .big { font-size:54px; font-weight:900; line-height:1.1; } .r-grid .win .big { color:var(--ok); }
+  .r-grid > div.win { border-color:var(--ok); }
+  /* season view (rotates with the live picks on ?view=rotate) */
+  #season { display:none; min-height:0; flex-direction:column; gap:21.6px; }
+  body.v-rotate main { grid-template-columns:1fr; } body.v-rotate #scores { display:none; }
+  body.v-rotate.pane-season #picks, body.v-rotate.pane-prime #picks { display:none; } body.v-rotate.pane-season #season, body.v-rotate.pane-prime #prime { display:flex; }
+  /* rotate view hides the show-bets list under the record (add &bets=1 to the URL to bring it back) */
+  body.v-rotate:not(.bets) #picks .bets-h, body.v-rotate:not(.bets) #picks .tix-box { display:none; }
+  body.v-rotate:not(.bets) #picks .people .p.HTP { padding:10.8px 32.4px; } body.v-rotate:not(.bets) #picks .people .p.HTP .big { font-size:108px; }
+  body.v-rotate:not(.bets) #picks .people .p.HTP .nm { font-size:86.4px; font-weight:900; letter-spacing:1.08px; line-height:1; } body.v-rotate:not(.bets) #picks .people .p.HTP .sub { font-size:23.76px; }
+  /* ...and shows the week's scores under the record instead */
+  body.v-rotate.pane-picks:not(.bets) main { grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+  body.v-rotate.pane-picks:not(.bets) #scores { display:flex; order:2; min-height:0; }
+  body.v-rotate.pane-picks:not(.bets) #picks { order:1; }
+  body.v-rotate.pane-picks:not(.bets) .games { grid-template-columns:repeat(4,1fr); grid-auto-rows:1fr; gap:10.8px; }
+  body.v-rotate.pane-picks:not(.bets) .g { padding:6.48px 15.12px; gap:0; align-content:center; }
+  body.v-rotate.pane-picks:not(.bets) .row { grid-template-columns:54px 1fr auto; gap:12.96px; }
+  body.v-rotate.pane-picks:not(.bets) .row img { width:54px; height:54px; }
+  body.v-rotate.pane-picks:not(.bets) .tm { font-size:36.72px; letter-spacing:0; } body.v-rotate.pane-picks:not(.bets) .tm small { display:none; }
+  body.v-rotate.pane-picks:not(.bets) .sc { font-size:56.16px; min-width:64.8px; line-height:1.05; }
+  body.v-rotate.pane-picks:not(.bets) .st { font-size:18.36px; } body.v-rotate.pane-picks:not(.bets) .chips { display:none; }
+  body.v-rotate.pane-picks:not(.bets) #scores-h { display:none; }
+  body.v-rotate.pane-odds #picks, body.v-rotate.pane-news #picks { display:none; }
+  body.v-rotate.pane-odds #odds, body.v-rotate.pane-news #news { display:flex; }
+  body.v-rotate.pane-insights #picks { display:none; } body.v-rotate.pane-insights #insights { display:flex; }
+  #insights { display:none; min-height:0; flex-direction:column; gap:17.28px; }
+  .ins-focus { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:32.4px; background:linear-gradient(120deg,var(--navy),#0b1240 55%,var(--red)); border-radius:17.28px; padding:21.6px 32.4px; }
+  .ins-focus .tm { display:flex; align-items:center; gap:21.6px; font-size:64.8px; font-weight:900; text-transform:uppercase; } .ins-focus .tm.h { justify-content:flex-end; }
+  .ins-focus .tm img { width:108px; height:108px; object-fit:contain; } .ins-focus .mid { text-align:center; } .ins-focus .mid b { display:block; font-size:25.92px; letter-spacing:4.32px; color:#ffd6dc; }
+  .ins-focus .mid span { font-size:43.2px; font-weight:900; } .ins-lines { display:flex; gap:12.96px; justify-content:center; margin-top:10.8px; }
+  .ins-lines div { background:rgba(0,0,0,.35); border-radius:10.8px; padding:6.48px 17.28px; text-align:center; } .ins-lines small { display:block; font-size:15.12px; letter-spacing:2.16px; color:#cfd4f5; } .ins-lines strong { font-size:34.56px; }
+  .ins-cols { display:grid; grid-template-columns:1fr 1.5fr; gap:21.6px; flex:1; min-height:0; }
+  .ins-cols.solo { grid-template-columns:1fr; }
+  .ins-box { display:flex; flex-direction:column; gap:10.8px; min-height:0; }
+  .mv { background:var(--panel); border:2.7px solid var(--line); border-radius:12.96px; padding:11.88px 17.28px; display:grid; grid-template-columns:auto 1fr; gap:4.32px 15.12px; align-items:center; }
+  .mv img { width:49.68px; height:49.68px; grid-row:span 2; object-fit:contain; } .mv .gm { font-size:28.08px; font-weight:900; } .mv .ln { font-size:22.68px; color:#dfe4ff; font-weight:700; }
+  .mv .ln b { color:var(--gold); } .mv .ln .up { color:var(--ok); } .mv .ln .dn { color:var(--bad); }
+  .tr-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10.8px; }
+  .tr { background:var(--panel); border:2.7px solid var(--line); border-radius:12.96px; padding:10.8px 15.12px; display:grid; grid-template-columns:75.6px 1fr auto; gap:0 12.96px; align-items:center; }
+  .tr img { width:75.6px; height:56.16px; object-fit:cover; object-position:top; border-radius:8.64px; background:#1d2560; grid-row:span 2; }
+  .tr .nm { font-size:27px; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .tr .bt { font-size:21.6px; font-weight:800; color:#dfe4ff; }
+  .tr .bt .OVER { color:var(--ok); } .tr .bt .UNDER { color:var(--bad); }
+  .tr .rt { grid-row:span 2; text-align:right; } .tr .rt b { display:block; font-size:47.52px; font-weight:900; color:var(--ok); line-height:1; } .tr .rt small { font-size:17.28px; color:var(--muted); font-weight:700; }
+  .gp-list { display:flex; flex-direction:column; gap:17.28px; flex:1; min-height:0; }
+  .gp { flex:1; background:var(--panel); border:3.24px solid var(--line); border-radius:19.44px; padding:17.28px 25.92px; display:flex; flex-direction:column; justify-content:center; gap:17.28px; min-height:0; }
+  .gp-top { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:21.6px; }
+  .gp-team { display:flex; align-items:center; gap:17.28px; } .gp-team.h { justify-content:flex-end; text-align:right; }
+  .gp-team img { width:97.2px; height:97.2px; object-fit:contain; } .gp-team b { display:block; font-size:60.48px; font-weight:900; text-transform:uppercase; line-height:1; } .gp-team span { font-size:23.76px; color:var(--muted); font-weight:700; }
+  .gp-mid { text-align:center; } .gp-ko { font-size:21.6px; font-weight:800; letter-spacing:3.24px; color:#ffd6dc; margin-bottom:8.64px; }
+  .gp-lines { display:flex; gap:10.8px; } .gp-lines div { background:#1d2560; border-radius:10.8px; padding:6.48px 17.28px; min-width:162px; }
+  .gp-lines small { display:block; font-size:15.12px; letter-spacing:2.16px; color:var(--muted); font-weight:800; } .gp-lines strong { display:block; font-size:41.04px; font-weight:900; } .gp-lines em { font-style:normal; font-size:19.44px; color:#dfe4ff; font-weight:700; }
+  .gp-move { margin-top:8.64px; font-size:21.6px; font-weight:900; color:var(--gold); letter-spacing:1.62px; }
+  .gp-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10.8px; }
+  .gp-stat { background:#0d1336; border-radius:12.96px; padding:10.8px 17.28px; display:flex; align-items:baseline; gap:15.12px; } .gp-stat strong { font-size:47.52px; font-weight:900; white-space:nowrap; } .gp-stat span { font-size:22.68px; color:#dfe4ff; font-weight:700; }
+  .gp-stat.good { background:#0c2a1f; box-shadow:inset 5.4px 0 0 var(--ok); } .gp-stat.good strong { color:var(--ok); }
+  .gp.big { gap:15.12px; padding:15.12px 28.08px; } .gp.big .gp-team img { width:140.4px; height:140.4px; } .gp.big .gp-team b { font-size:86.4px; } .gp.big .gp-team span { font-size:28.08px; }
+  .gp.big .gp-lines div { min-width:205.2px; } .gp.big .gp-lines strong { font-size:54px; } .gp.big .gp-lines em { font-size:23.76px; } .gp.big .gp-lines small { font-size:18.36px; }
+  .gp.big .gp-stats { grid-template-columns:repeat(3,1fr); } .gp.big .gp-stat { padding:10.8px 19.44px; } .gp.big .gp-stat strong { font-size:58.32px; } .gp.big .gp-stat span { font-size:28.08px; }
+  .gp-facts { display:grid; grid-template-columns:1fr 1fr; gap:9.72px; }
+  .gp.big .gp-facts { grid-template-columns:1fr; gap:11.88px; }
+  .lt { display:flex; align-items:stretch; border-radius:6.48px; overflow:hidden; box-shadow:0 6.48px 17.28px rgba(0,0,0,.45); min-width:0; }
+  .lt-tag { background:var(--red); color:#fff; font-size:19.44px; font-weight:900; letter-spacing:2.16px; padding:0 15.12px; display:flex; align-items:center; white-space:nowrap; text-transform:uppercase; }
+  .lt-txt { flex:1; min-width:0; background:linear-gradient(90deg,#f4f6ff,#dfe4ff); color:#0b1240; font-size:27px; font-weight:900; padding:7.56px 15.12px; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.216px; }
+  .gp.big .lt-tag { font-size:30.24px; min-width:259.2px; justify-content:center; padding:0 21.6px; } .gp.big .lt-txt { font-size:45.36px; padding:11.88px 21.6px; white-space:normal; line-height:1.1; }
+  .gp > * { flex-shrink:0; } .gp { overflow:hidden; }
+  .gp-pick { display:flex; align-items:stretch; border-radius:8.64px; overflow:hidden; align-self:center; box-shadow:0 0 32.4px rgba(24,201,100,.35); }
+  .gp-pick-tag { background:var(--ok); color:#04220f; font-size:30.24px; font-weight:900; letter-spacing:3.24px; padding:8.64px 21.6px; display:flex; align-items:center; }
+  .gp-pick-txt { background:#fff; color:#0b1240; font-size:49.68px; font-weight:900; padding:4.32px 25.92px; text-transform:uppercase; }
+  .gp-pick-src { background:#0c2a1f; color:#d9ffe7; font-size:21.6px; font-weight:800; padding:0 17.28px; display:flex; align-items:center; text-transform:uppercase; letter-spacing:1.08px; }
+  .tr-grid.three { grid-template-columns:repeat(4,1fr); } .tr-grid.three .tr .nm { font-size:23.76px; } .tr-grid.three .tr .rt b { font-size:38.88px; }
+  #odds, #news { display:none; min-height:0; flex-direction:column; gap:15.12px; }
+  .odds { display:grid; grid-template-columns:repeat(2,1fr); grid-auto-rows:1fr; gap:10.8px; flex:1; min-height:0; }
+  .od { background:var(--panel); border:2.7px solid var(--line); border-radius:15.12px; padding:10.8px 21.6px; min-height:0; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) repeat(3,162px); align-items:center; column-gap:12.96px; }
+  .od .tms { min-width:0; } .od .t { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .od .tms { display:grid; gap:2.16px; } .od .t { display:flex; align-items:center; gap:15.12px; font-size:45.36px; font-weight:900; line-height:1.2; }
+  .od .t img { width:64.8px; height:64.8px; object-fit:contain; } .od .ko { font-size:21.6px; color:var(--muted); font-weight:700; letter-spacing:1.08px; }
+  .od .col { display:grid; gap:6.48px; text-align:center; } .od .col b { font-size:19.44px; color:var(--muted); letter-spacing:1.62px; }
+  .od .col span { font-size:47.52px; font-weight:900; padding:4.32px 0 !important; font-variant-numeric:tabular-nums; background:#1d2560; border-radius:6.48px; padding:2.16px 0; }
+  .od.live { border-color:var(--red); }
+  .nws { display:grid; grid-template-columns:repeat(2,1fr); grid-auto-rows:1fr; gap:15.12px; flex:1; min-height:0; }
+  .nw { background:var(--panel); border:2.7px solid var(--line); border-radius:12.96px; overflow:hidden; display:grid; grid-template-columns:324px 1fr; }
+  .nw img { width:100%; height:100%; object-fit:cover; } .nw .tx { padding:15.12px 19.44px; display:flex; flex-direction:column; gap:8.64px; justify-content:center; }
+  .nw .hd { font-size:32.4px; font-weight:900; line-height:1.1; } .nw .ds { font-size:20.52px; color:#dfe4ff; line-height:1.25; }
+  .nw .ag { font-size:16.2px; color:var(--muted); font-weight:700; letter-spacing:1.62px; text-transform:uppercase; }
+  #prime { display:none; min-height:0; flex-direction:column; gap:17.28px; }
+  #prime .p.HTP { padding:10.8px 21.6px; } #prime .p.HTP .big { font-size:86.4px; }
+  #prime .hit { padding:9.72px 15.12px; } #prime .hit .pr { font-size:45.36px; }
+  #prime .hits { grid-template-columns:repeat(4,1fr); }
+  .hits-box { flex:1; min-height:0; overflow:hidden; }
+  #season .s-people .p.HTP .big { font-size:140.4px; } #season .ty.win .big { font-size:108px; }
+  .hits { display:grid; grid-template-columns:repeat(3,1fr); gap:12.96px; }
+  .hit { background:#0c2a1f; border:2.7px solid var(--ok); border-radius:12.96px; padding:12.96px 17.28px; display:grid; gap:4.32px; }
+  .hit .pr { font-size:54px; font-weight:900; color:var(--ok); line-height:1; font-variant-numeric:tabular-nums; }
+  .hit .lb { font-size:25.92px; font-weight:800; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hit .bt { font-size:18.36px; font-weight:700; letter-spacing:1.62px; text-transform:uppercase; color:#d9ffe7; }
+  .hit .bt b { background:var(--ok); color:#04220f; padding:0 6.48px; border-radius:4.32px; margin-right:8.64px; }
+  body.v-season main { grid-template-columns:1fr; } body.v-season #scores, body.v-season #picks { display:none; } body.v-season #season { display:flex; }
+  main section { animation:fadein .6s ease-out both; }
+  @keyframes fadein { from { opacity:0; transform:translateY(12.96px) } to { opacity:1; transform:none } }
+  .s-people { display:grid; grid-template-columns:repeat(4,1fr); gap:15.12px; }
+  .s-people .p.HTP { grid-column:1 / -1; padding:21.6px 32.4px; } .s-people .p.HTP .big { font-size:118.8px; } .s-people .p .big { font-size:81px; }
+  .s-people .p .sub { font-size:21.6px; } .s-people .p .nm { font-size:23.76px; }
+  .s-types { display:grid; grid-template-columns:repeat(auto-fit,minmax(259.2px,1fr)); gap:12.96px; }
+  .ty { background:var(--panel); border:2.7px solid var(--line); border-radius:12.96px; padding:12.96px 17.28px; display:grid; gap:3.24px; }
+  .ty .nm { font-size:19.44px; font-weight:800; letter-spacing:2.16px; text-transform:uppercase; color:var(--muted); }
+  .ty .big { font-size:54px; font-weight:900; line-height:1; font-variant-numeric:tabular-nums; }
+  .ty .sub { font-size:18.36px; font-weight:600; color:#dfe4ff; font-variant-numeric:tabular-nums; }
+  .s-types { grid-template-columns:repeat(6,1fr); }
+  .ty { grid-column:span 1; opacity:.8; } .ty .big { font-size:38.88px; }
+  .ty.win { grid-column:span 2; opacity:1; background:linear-gradient(135deg,#0c2a1f,#10163a); border-color:var(--ok); }
+  .ty.win .big { font-size:86.4px; color:var(--ok); } .ty.win .nm { font-size:25.92px; color:#fff; }
+  .ladder { display:flex; align-items:center; gap:32.4px; border-radius:15.12px; padding:17.28px 25.92px; background:linear-gradient(90deg,#0c2a1f,#10163a); border:2.7px solid var(--ok); }
+  .ladder .nm { font-size:25.92px; font-weight:900; letter-spacing:2.16px; text-transform:uppercase; }
+  .ladder .big { font-size:75.6px; font-weight:900; white-space:nowrap; color:var(--ok); font-variant-numeric:tabular-nums; }
+  .ladder .rungs { display:flex; gap:7.56px; margin-left:auto; }
+  .ladder .rungs i { width:45.36px; height:45.36px; border-radius:6.48px; background:#1d2560; display:block; }
+  .ladder .rungs i.on { background:var(--ok); } .ladder .lhits { display:flex; flex-wrap:wrap; gap:10.8px; margin-top:10.8px; } .ladder .lhits span { background:var(--ok); color:#06210f; font-weight:900; font-size:23.76px; letter-spacing:1.08px; text-transform:uppercase; padding:5.4px 15.12px; border-radius:8.64px; } .ladder .sub { font-size:21.6px; color:#d9ffe7; font-weight:700; }
+
+  /* the day's facts: one lower-third bar along the bottom of every rotate screen */
+  #factbar { display:none; position:fixed; left:27px; right:27px; bottom:17.28px; z-index:20; align-items:stretch; border-radius:8.64px; overflow:hidden; box-shadow:0 10.8px 32.4px rgba(0,0,0,.6); height:82.08px; }
+  body.v-rotate #factbar.on { display:flex; } body.v-rotate main { padding-bottom:118.8px; }
+  #factbar .ft { background:var(--red); color:#fff; font-size:25.92px; font-weight:900; letter-spacing:2.16px; padding:0 23.76px; display:flex; flex-direction:column; justify-content:center; text-transform:uppercase; min-width:280.8px; }
+  #factbar .ft small { font-size:17.28px; opacity:.85; letter-spacing:1.08px; }
+  #factbar .fx { flex:1; min-width:0; background:linear-gradient(90deg,#f4f6ff,#dfe4ff); color:#0b1240; font-size:41.04px; font-weight:900; text-transform:uppercase; display:flex; align-items:center; padding:0 25.92px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #factbar .fn { background:#0b1240; color:#fff; font-size:21.6px; font-weight:900; padding:0 19.44px; display:flex; align-items:center; font-variant-numeric:tabular-nums; }
+  #factbar.swap .fx, #factbar.swap .ft { animation:fswap .5s ease-out both; }
+  @keyframes fswap { from { opacity:0; transform:translateY(21.6px); } to { opacity:1; transform:none; } }
+  body.pane-insights #factbar { display:none !important; } body.pane-insights main { padding-bottom:27px; }
+
+  /* cash celebration overlay */
+  #cash { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center; flex-direction:column; gap:27px;
+          background:radial-gradient(ellipse at center, rgba(24,201,100,.55), rgba(4,40,20,.92) 70%); }
+  #cash.on { display:flex; animation:cashin .35s ease-out both; }
+  #cash.off { animation:cashout .6s ease-in both; }
+  @keyframes cashin { from { opacity:0 } to { opacity:1 } }
+  @keyframes cashout { from { opacity:1 } to { opacity:0 } }
+  #cash canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #cash .flash { position:absolute; inset:0; background:#fff; animation:flash .5s ease-out both; }
+  @keyframes flash { from { opacity:.9 } to { opacity:0 } }
+  .stamp { position:relative; transform:rotate(-5deg); background:var(--ok); color:#fff; border:10.8px solid #fff; border-radius:32.4px;
+           padding:21.6px 75.6px 27px; display:flex; align-items:center; gap:32.4px; box-shadow:0 0 129.6px rgba(24,201,100,.9);
+           animation:slam .55s cubic-bezier(.2,1.6,.4,1) .15s both; }
+  @keyframes slam { from { transform:rotate(-5deg) scale(2.6); opacity:0 } to { transform:rotate(-5deg) scale(1); opacity:1 } }
+  .stamp .ck { font-size:172.8px; font-weight:900; line-height:1; }
+  .stamp .word { font-size:205.2px; font-weight:900; letter-spacing:-3.24px; line-height:.9; }
+  .cash-bet { position:relative; font-size:75.6px; font-weight:900; text-transform:uppercase; text-align:center; text-shadow:0 6.48px 21.6px rgba(0,0,0,.5);
+              animation:rise .5s ease-out .55s both; max-width:90vw; }
+  .cash-sub { position:relative; font-size:36.72px; font-weight:700; letter-spacing:3.24px; text-transform:uppercase; color:#d9ffe7; animation:rise .5s ease-out .75s both; }
+  .cash-sub .tag { font-size:28.08px; vertical-align:4.32px; margin-right:12.96px; }
+  @keyframes rise { from { transform:translateY(43.2px); opacity:0 } to { transform:none; opacity:1 } }
+</style><style>html{width:100vw!important;height:100vh!important;overflow:hidden;background:#070a1c}body{position:absolute;width:1920px!important;height:1080px!important;transform-origin:0 0}</style><script>function fit(){var s=Math.min(innerWidth/1920,innerHeight/1080),b=document.body;b.style.transform="scale("+s+")";b.style.left=(innerWidth-1920*s)/2+"px";b.style.top=(innerHeight-1080*s)/2+"px";}addEventListener("resize",fit);addEventListener("DOMContentLoaded",fit);</script></head>
+<body>
+<div id="cash"><div class="flash"></div><canvas id="cashfx"></canvas>
+  <div class="stamp"><span class="ck">✓</span><span class="word">CASHED</span></div>
+  <div class="cash-bet" id="cashbet"></div><div class="cash-sub" id="cashsub"></div></div>
+<div id="factbar"><div class="ft"><span id="fb-tag"></span><small id="fb-game"></small></div><div class="fx" id="fb-txt"></div><div class="fn" id="fb-n"></div></div>
+<div class="wrap">
+  <header><div class="logo">Hold <b>The</b> Phone</div><div class="hdr-mid" id="hdr">Pick tracker · Live scores</div><nav id="webnav"><a href="?view=both">Scores</a><a href="?view=rotate&pane=picks">Picks</a><a href="?view=rotate&pane=records">Records</a><a href="?view=rotate&pane=season">Season</a><a href="?view=rotate&pane=prime">Prime Time</a><a href="?view=rotate&pane=insights">Insights</a><a href="?view=rotate&pane=odds">Odds</a><a href="?view=rotate&pane=news">News</a></nav><div class="clock" id="clock"></div></header>
+  <main>
+    <section id="scores"><h2 id="scores-h">NFL · This week's scores · our picks marked</h2><div class="games" id="games"><div class="empty">Loading scores…</div></div></section>
+    <section id="picks">
+      <div class="people" id="people"></div>
+      <h2 style="margin:0" class="bets-h">Show bets</h2>
+      <div class="tix-box"><div class="tix" id="tix"><div class="empty">Loading picks…</div></div></div>
+    </section>
+    <section id="season">
+      <h2 style="margin:0" id="s-title">2026 season · every show</h2>
+      <div class="s-people" id="s-people"></div>
+      <div class="s-types" id="s-types"></div>
+      <div class="ladder" id="s-ladder"></div>
+    </section>
+    <section id="insights">
+      <div id="ins-games" class="gp-list"></div>
+      <h2 style="margin:0" id="ins-tr-h">Hottest props · last 10 games · BetMGM</h2>
+      <div class="tr-grid three" id="ins-trends"></div>
+    </section>
+    <section id="odds">
+      <h2 style="margin:0">This week's lines · BetMGM</h2>
+      <div class="odds" id="o-games"><div class="empty">Lines post here as BetMGM opens them.</div></div>
+    </section>
+    <section id="news">
+      <h2 style="margin:0">NFL news</h2>
+      <div class="nws" id="n-list"><div class="empty">Loading news…</div></div>
+    </section>
+    <section id="records">
+      <div class="r-top" id="r-top"></div>
+      <h2 style="margin:0">By show</h2><div class="r-grid" id="r-types"></div>
+      <h2 style="margin:0">By caller</h2><div class="r-grid" id="r-who"></div>
+    </section>
+    <section id="prime">
+      <h2 style="margin:0">Primetime · Thursday &amp; Monday Night Football</h2>
+      <div class="s-people" id="p-rec"></div>
+      <h2 style="margin:0" id="s-hits-h">Every big cash this season</h2>
+      <div class="hits-box"><div class="hits" id="s-hits"></div></div>
+    </section>
+  </main>
+</div>
+<script>window.SNAP = {"/api/scores":[{"id":"401873023","date":"2026-10-30T00:15Z","state":"pre","detail":"10/29 - 8:15 PM EDT","possession":null,"down":"","redzone":false,"last":"","broadcast":"Prime Video","away":{"abbr":"CAR","name":"Panthers","id":"29","score":"0","color":"#0085ca","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/car.png","record":"3-3"},"home":{"abbr":"GB","name":"Packers","id":"9","score":"0","color":"#204e32","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/gb.png","record":"4-3"}},{"id":"401873026","date":"2026-11-01T18:00Z","state":"pre","detail":"11/1 - 1:00 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"CBS","away":{"abbr":"BAL","name":"Ravens","id":"33","score":"0","color":"#29126f","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/bal.png","record":"4-3"},"home":{"abbr":"BUF","name":"Bills","id":"2","score":"0","color":"#00338d","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/buf.png","record":"5-1"}},{"id":"401873031","date":"2026-11-01T18:00Z","state":"pre","detail":"11/1 - 1:00 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"CBS","away":{"abbr":"TEN","name":"Titans","id":"10","score":"0","color":"#4495d2","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/ten.png","record":"1-6"},"home":{"abbr":"CIN","name":"Bengals","id":"4","score":"0","color":"#fb4f14","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/cin.png","record":"4-2"}},{"id":"401873024","date":"2026-11-01T18:00Z","state":"pre","detail":"11/1 - 1:00 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"Fox","away":{"abbr":"ARI","name":"Cardinals","id":"22","score":"0","color":"#a40227","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/ari.png","record":"2-5"},"home":{"abbr":"DAL","name":"Cowboys","id":"6","score":"0","color":"#002a5c","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/dal.png","record":"3-4"}},{"id":"401873030","date":"2026-11-01T18:00Z","state":"pre","detail":"11/1 - 1:00 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"Fox","away":{"abbr":"MIN","name":"Vikings","id":"16","score":"0","color":"#4f2683","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/min.png","record":"6-0"},"home":{"abbr":"DET","name":"Lions","id":"8","score":"0","color":"#0076b6","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/det.png","record":"4-2"}},{"id":"401873029","date":"2026-11-01T18:00Z","state":"pre","detail":"11/1 - 1:00 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"Fox","away":{"abbr":"LV","name":"Raiders","id":"13","score":"0","color":"#000000","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/lv.png","record":"3-4"},"home":{"abbr":"NYJ","name":"Jets","id":"20","score":"0","color":"#115740","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/nyj.png","record":"2-5"}},{"id":"401873027","date":"2026-11-01T18:00Z","state":"pre","detail":"11/1 - 1:00 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"CBS","away":{"abbr":"CLE","name":"Browns","id":"5","score":"0","color":"#472a08","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/cle.png","record":"5-2"},"home":{"abbr":"PIT","name":"Steelers","id":"23","score":"0","color":"#000000","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/pit.png","record":"5-2"}},{"id":"401873025","date":"2026-11-01T18:00Z","state":"pre","detail":"11/1 - 1:00 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"Fox","away":{"abbr":"ATL","name":"Falcons","id":"1","score":"0","color":"#a71930","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/atl.png","record":"3-4"},"home":{"abbr":"TB","name":"Buccaneers","id":"27","score":"0","color":"#bd1c36","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/tb.png","record":"2-5"}},{"id":"401873028","date":"2026-11-01T18:00Z","state":"pre","detail":"11/1 - 1:00 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"CBS","away":{"abbr":"IND","name":"Colts","id":"11","score":"0","color":"#003b75","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/ind.png","record":"2-5"},"home":{"abbr":"JAX","name":"Jaguars","id":"30","score":"0","color":"#007487","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/jax.png","record":"4-2"}},{"id":"401873032","date":"2026-11-01T21:05Z","state":"pre","detail":"11/1 - 4:05 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"Fox","away":{"abbr":"LAC","name":"Chargers","id":"24","score":"0","color":"#0080c6","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/lac.png","record":"0-6"},"home":{"abbr":"LAR","name":"Rams","id":"14","score":"0","color":"#003594","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/lar.png","record":"3-4"}},{"id":"401873033","date":"2026-11-01T21:25Z","state":"pre","detail":"11/1 - 4:25 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"CBS","away":{"abbr":"KC","name":"Chiefs","id":"12","score":"0","color":"#e31837","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/kc.png","record":"5-1"},"home":{"abbr":"DEN","name":"Broncos","id":"7","score":"0","color":"#0a2343","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/den.png","record":"5-2"}},{"id":"401873034","date":"2026-11-01T21:25Z","state":"pre","detail":"11/1 - 4:25 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"CBS","away":{"abbr":"NE","name":"Patriots","id":"17","score":"0","color":"#002a5c","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/ne.png","record":"4-3"},"home":{"abbr":"MIA","name":"Dolphins","id":"15","score":"0","color":"#008e97","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/mia.png","record":"1-5"}},{"id":"401873035","date":"2026-11-02T01:20Z","state":"pre","detail":"11/1 - 8:20 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"NBC","away":{"abbr":"PHI","name":"Eagles","id":"21","score":"0","color":"#06424d","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/phi.png","record":"2-5"},"home":{"abbr":"WSH","name":"Commanders","id":"28","score":"0","color":"#5a1414","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/wsh.png","record":"1-4-1"}},{"id":"401873036","date":"2026-11-03T01:15Z","state":"pre","detail":"11/2 - 8:15 PM EST","possession":null,"down":"","redzone":false,"last":"","broadcast":"ESPN","away":{"abbr":"CHI","name":"Bears","id":"3","score":"0","color":"#0b1c3a","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/chi.png","record":"5-2"},"home":{"abbr":"SEA","name":"Seahawks","id":"26","score":"0","color":"#002a5c","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/sea.png","record":"4-3"}}],"/api/picks":{"show":{"name":"NFL Week 7 LIVE (Las Vegas)","show":"Sunday Livestream","week":"7","date":"2026-10-25"},"tickets":[{"ticket":"4:38|Show|Game Pick|Colts","time":"4:38","source":"Show","bet":"Game Pick","pick":"Colts","payout":"","who":"HTP","legs":[{"time":"4:38","source":"Show","bet":"Game Pick","payout":"","pick":"Colts","game":"IND @ MIN","market":"Spread","line":"+7","odds":"","result":"Win","who":"HTP","ticket":"4:38|Show|Game Pick|Colts"}],"won":1,"lost":0,"push":0,"status":"CASHED"},{"ticket":"4:59|Show|Game Pick|Jets","time":"4:59","source":"Show","bet":"Game Pick","pick":"Jets","payout":"","who":"HTP","legs":[{"time":"4:59","source":"Show","bet":"Game Pick","payout":"","pick":"Jets","game":"MIA @ NYJ","market":"Spread","line":"-4","odds":"","result":"Loss","who":"HTP","ticket":"4:59|Show|Game Pick|Jets"}],"won":0,"lost":1,"push":0,"status":"LOST"},{"ticket":"5:06|Show|Game Pick|Ravens","time":"5:06","source":"Show","bet":"Game Pick","pick":"Ravens","payout":"","who":"HTP","legs":[{"time":"5:06","source":"Show","bet":"Game Pick","payout":"","pick":"Ravens","game":"CIN @ BAL","market":"Spread","line":"+3","odds":"","result":"Loss","who":"HTP","ticket":"5:06|Show|Game Pick|Ravens"}],"won":0,"lost":1,"push":0,"status":"LOST"},{"ticket":"5:17|Show|Game Pick|Titans","time":"5:17","source":"Show","bet":"Game Pick","pick":"Titans","payout":"","who":"HTP","legs":[{"time":"5:17","source":"Show","bet":"Game Pick","payout":"","pick":"Titans","game":"CLE @ TEN","market":"Spread","line":"+2.5","odds":"","result":"Loss","who":"HTP","ticket":"5:17|Show|Game Pick|Titans"}],"won":0,"lost":1,"push":0,"status":"LOST"},{"ticket":"5:26|Show|Game Pick|Buccaneers","time":"5:26","source":"Show","bet":"Game Pick","pick":"Buccaneers","payout":"","who":"HTP","legs":[{"time":"5:26","source":"Show","bet":"Game Pick","payout":"","pick":"Buccaneers","game":"TB @ CAR","market":"Spread","line":"+3","odds":"","result":"Win","who":"HTP","ticket":"5:26|Show|Game Pick|Buccaneers"}],"won":1,"lost":0,"push":0,"status":"CASHED"},{"ticket":"5:42|Show|Game Pick|Falcons","time":"5:42","source":"Show","bet":"Game Pick","pick":"Falcons","payout":"","who":"HTP","legs":[{"time":"5:42","source":"Show","bet":"Game Pick","payout":"","pick":"Falcons","game":"SF @ ATL","market":"Spread","line":"+2.5","odds":"","result":"Win","who":"HTP","ticket":"5:42|Show|Game Pick|Falcons"}],"won":1,"lost":0,"push":0,"status":"CASHED"},{"ticket":"5:51|Show|Game Pick|Texans","time":"5:51","source":"Show","bet":"Game Pick","pick":"Texans","payout":"","who":"HTP","legs":[{"time":"5:51","source":"Show","bet":"Game Pick","payout":"","pick":"Texans","game":"NYG @ HOU","market":"Spread","line":"-10.5","odds":"","result":"Loss","who":"HTP","ticket":"5:51|Show|Game Pick|Texans"}],"won":0,"lost":1,"push":0,"status":"LOST"},{"ticket":"6:08|Show|Game Pick|Cardinals","time":"6:08","source":"Show","bet":"Game Pick","pick":"Cardinals","payout":"","who":"HTP","legs":[{"time":"6:08","source":"Show","bet":"Game Pick","payout":"","pick":"Cardinals","game":"DEN @ ARI","market":"Spread","line":"+4.5","odds":"","result":"Loss","who":"HTP","ticket":"6:08|Show|Game Pick|Cardinals"}],"won":0,"lost":1,"push":0,"status":"LOST"},{"ticket":"6:26|Show|Game Pick|Raiders","time":"6:26","source":"Show","bet":"Game Pick","pick":"Raiders","payout":"","who":"HTP","legs":[{"time":"6:26","source":"Show","bet":"Game Pick","payout":"","pick":"Raiders","game":"LAR @ LV","market":"Spread","line":"+3","odds":"","result":"Loss","who":"HTP","ticket":"6:26|Show|Game Pick|Raiders"}],"won":0,"lost":1,"push":0,"status":"LOST"},{"ticket":"6:29|Show|Game Pick|Packers","time":"6:29","source":"Show","bet":"Game Pick","pick":"Packers","payout":"","who":"HTP","legs":[{"time":"6:29","source":"Show","bet":"Game Pick","payout":"","pick":"Packers","game":"GB @ DET","market":"Spread","line":"+3.5","odds":"","result":"Win","who":"HTP","ticket":"6:29|Show|Game Pick|Packers"}],"won":1,"lost":0,"push":0,"status":"CASHED"},{"ticket":"6:33|Show|Game Pick|Seahawks","time":"6:33","source":"Show","bet":"Game Pick","pick":"Seahawks","payout":"","who":"HTP","legs":[{"time":"6:33","source":"Show","bet":"Game Pick","payout":"","pick":"Seahawks","game":"KC @ SEA","market":"Spread","line":"-3","odds":"","result":"Win","who":"HTP","ticket":"6:33|Show|Game Pick|Seahawks"}],"won":1,"lost":0,"push":0,"status":"CASHED"},{"ticket":"17:16|Show|Parlay","time":"17:16","source":"Show","bet":"Parlay","pick":"Falcons","payout":"+2600","who":"HTP","legs":[{"time":"17:16","source":"Show","bet":"Parlay","payout":"+2600","pick":"Falcons","game":"SF @ ATL","market":"Spread","line":"+2.5","odds":"","result":"Win","who":"HTP","ticket":"17:16|Show|Parlay"},{"time":"17:16","source":"Show","bet":"Parlay","payout":"+2600","pick":"Colts","game":"IND @ MIN","market":"Spread","line":"+7","odds":"","result":"Win","who":"HTP","ticket":"17:16|Show|Parlay"},{"time":"17:16","source":"Show","bet":"Parlay","payout":"+2600","pick":"Texans","game":"NYG @ HOU","market":"Spread","line":"-10.5","odds":"","result":"Loss","who":"HTP","ticket":"17:16|Show|Parlay"},{"time":"17:16","source":"Show","bet":"Parlay","payout":"+2600","pick":"Packers","game":"GB @ DET","market":"Spread","line":"+3.5","odds":"","result":"Win","who":"HTP","ticket":"17:16|Show|Parlay"},{"time":"17:16","source":"Show","bet":"Parlay","payout":"+2600","pick":"Seahawks","game":"KC @ SEA","market":"Spread","line":"-3","odds":"","result":"Win","who":"HTP","ticket":"17:16|Show|Parlay"}],"won":4,"lost":1,"push":0,"status":"LOST"},{"ticket":"17:59|Show|Parlay","time":"17:59","source":"Show","bet":"Parlay","pick":"Amon-Ra St. Brown","payout":"$40 to win $80","who":"HTP","legs":[{"time":"17:59","source":"Show","bet":"Parlay","payout":"$40 to win $80","pick":"Amon-Ra St. Brown","game":"GB @ DET","market":"Receiving Yards","line":"50+","odds":"","result":"Win","who":"HTP","ticket":"17:59|Show|Parlay"},{"time":"17:59","source":"Show","bet":"Parlay","payout":"$40 to win $80","pick":"Christian Watson","game":"GB @ DET","market":"Receiving Yards","line":"50+","odds":"","result":"Win","who":"HTP","ticket":"17:59|Show|Parlay"},{"time":"17:59","source":"Show","bet":"Parlay","payout":"$40 to win $80","pick":"Kenneth Walker III","game":"KC @ SEA","market":"Rushing Yards","line":"50+","odds":"","result":"Loss","who":"HTP","ticket":"17:59|Show|Parlay"},{"time":"17:59","source":"Show","bet":"Parlay","payout":"$40 to win $80","pick":"Texans","game":"NYG @ HOU","market":"Moneyline","line":"","odds":"","result":"Loss","who":"HTP","ticket":"17:59|Show|Parlay"}],"won":2,"lost":2,"push":0,"status":"LOST"},{"ticket":"20:02|Show|Parlay","time":"20:02","source":"Show","bet":"Parlay","pick":"Bijan Robinson","payout":"+1100","who":"HTP","legs":[{"time":"20:02","source":"Show","bet":"Parlay","payout":"+1100","pick":"Bijan Robinson","game":"SF @ ATL","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"20:02|Show|Parlay"},{"time":"20:02","source":"Show","bet":"Parlay","payout":"+1100","pick":"Christian McCaffrey","game":"SF @ ATL","market":"Anytime TD","line":"","odds":"","result":"Win","who":"HTP","ticket":"20:02|Show|Parlay"},{"time":"20:02","source":"Show","bet":"Parlay","payout":"+1100","pick":"Jonathan Taylor","game":"IND @ MIN","market":"Anytime TD","line":"","odds":"","result":"Win","who":"HTP","ticket":"20:02|Show|Parlay"},{"time":"20:02","source":"Show","bet":"Parlay","payout":"+1100","pick":"Derrick Henry","game":"CIN @ BAL","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"20:02|Show|Parlay"},{"time":"20:02","source":"Show","bet":"Parlay","payout":"+1100","pick":"Kenneth Walker III","game":"KC @ SEA","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"20:02|Show|Parlay"},{"time":"20:02","source":"Show","bet":"Parlay","payout":"+1100","pick":"Jahmyr Gibbs","game":"GB @ DET","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"20:02|Show|Parlay"}],"won":2,"lost":4,"push":0,"status":"LOST"},{"ticket":"26:29|Show|Parlay","time":"26:29","source":"Show","bet":"Parlay","pick":"Jets","payout":"","who":"HTP","legs":[{"time":"26:29","source":"Show","bet":"Parlay","payout":"","pick":"Jets","game":"MIA @ NYJ","market":"Moneyline","line":"","odds":"","result":"Loss","who":"HTP","ticket":"26:29|Show|Parlay"},{"time":"26:29","source":"Show","bet":"Parlay","payout":"","pick":"Titans","game":"CLE @ TEN","market":"Moneyline","line":"","odds":"","result":"Loss","who":"HTP","ticket":"26:29|Show|Parlay"},{"time":"26:29","source":"Show","bet":"Parlay","payout":"","pick":"Buccaneers","game":"TB @ CAR","market":"Spread","line":"+7.5","odds":"","result":"Win","who":"HTP","ticket":"26:29|Show|Parlay"},{"time":"26:29","source":"Show","bet":"Parlay","payout":"","pick":"Cardinals","game":"DEN @ ARI","market":"Spread","line":"+7.5","odds":"","result":"Loss","who":"HTP","ticket":"26:29|Show|Parlay"}],"won":1,"lost":3,"push":0,"status":"LOST"},{"ticket":"27:09|Show|Parlay","time":"27:09","source":"Show","bet":"Parlay","pick":"Colts","payout":"","who":"HTP","legs":[{"time":"27:09","source":"Show","bet":"Parlay","payout":"","pick":"Colts","game":"IND @ MIN","market":"Moneyline","line":"","odds":"","result":"Loss","who":"HTP","ticket":"27:09|Show|Parlay"},{"time":"27:09","source":"Show","bet":"Parlay","payout":"","pick":"Falcons","game":"SF @ ATL","market":"Moneyline","line":"","odds":"","result":"Win","who":"HTP","ticket":"27:09|Show|Parlay"},{"time":"27:09","source":"Show","bet":"Parlay","payout":"","pick":"Seahawks","game":"KC @ SEA","market":"Moneyline","line":"","odds":"","result":"Win","who":"HTP","ticket":"27:09|Show|Parlay"}],"won":2,"lost":1,"push":0,"status":"LOST"},{"ticket":"30:20|Show|Parlay","time":"30:20","source":"Show","bet":"Parlay","pick":"George Kittle","payout":"+11000","who":"HTP","legs":[{"time":"30:20","source":"Show","bet":"Parlay","payout":"+11000","pick":"George Kittle","game":"SF @ ATL","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"30:20|Show|Parlay"},{"time":"30:20","source":"Show","bet":"Parlay","payout":"+11000","pick":"Dalton Schultz","game":"NYG @ HOU","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"30:20|Show|Parlay"},{"time":"30:20","source":"Show","bet":"Parlay","payout":"+11000","pick":"Brock Bowers","game":"LAR @ LV","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"30:20|Show|Parlay"},{"time":"30:20","source":"Show","bet":"Parlay","payout":"+11000","pick":"Trey McBride","game":"DEN @ ARI","market":"Anytime TD","line":"","odds":"","result":"Win","who":"HTP","ticket":"30:20|Show|Parlay"},{"time":"30:20","source":"Show","bet":"Parlay","payout":"+11000","pick":"Travis Kelce","game":"KC @ SEA","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"30:20|Show|Parlay"}],"won":1,"lost":4,"push":0,"status":"LOST"},{"ticket":"31:13|Show|First TD Scorer","time":"31:13","source":"Show","bet":"First TD Scorer","pick":"Nico Collins","payout":"$100 to win $60,000","who":"HTP","legs":[{"time":"31:13","source":"Show","bet":"First TD Scorer","payout":"$100 to win $60,000","pick":"Nico Collins","game":"NYG @ HOU","market":"First TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"31:13|Show|First TD Scorer"},{"time":"31:13","source":"Show","bet":"First TD Scorer","payout":"$100 to win $60,000","pick":"Christian Watson","game":"GB @ DET","market":"First TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"31:13|Show|First TD Scorer"},{"time":"31:13","source":"Show","bet":"First TD Scorer","payout":"$100 to win $60,000","pick":"Jaxon Smith-Njigba","game":"KC @ SEA","market":"First TD","line":"","odds":"","result":"Win","who":"HTP","ticket":"31:13|Show|First TD Scorer"}],"won":1,"lost":2,"push":0,"status":"LOST"},{"ticket":"32:34|Show|6 Leg Parlay","time":"32:34","source":"Show","bet":"6 Leg Parlay","pick":"Falcons","payout":"","who":"HTP","legs":[{"time":"32:34","source":"Show","bet":"6 Leg Parlay","payout":"","pick":"Falcons","game":"SF @ ATL","market":"Spread","line":"+7.5","odds":"","result":"Win","who":"HTP","ticket":"32:34|Show|6 Leg Parlay"},{"time":"32:34","source":"Show","bet":"6 Leg Parlay","payout":"","pick":"Texans","game":"NYG @ HOU","market":"Moneyline","line":"","odds":"","result":"Loss","who":"HTP","ticket":"32:34|Show|6 Leg Parlay"},{"time":"32:34","source":"Show","bet":"6 Leg Parlay","payout":"","pick":"Colts","game":"IND @ MIN","market":"Spread","line":"+10.5","odds":"","result":"Win","who":"HTP","ticket":"32:34|Show|6 Leg Parlay"},{"time":"32:34","source":"Show","bet":"6 Leg Parlay","payout":"","pick":"Packers","game":"GB @ DET","market":"Spread","line":"+3.5","odds":"","result":"Win","who":"HTP","ticket":"32:34|Show|6 Leg Parlay"},{"time":"32:34","source":"Show","bet":"6 Leg Parlay","payout":"","pick":"Raiders","game":"LAR @ LV","market":"Spread","line":"+7.5","odds":"","result":"Loss","who":"HTP","ticket":"32:34|Show|6 Leg Parlay"},{"time":"32:34","source":"Show","bet":"6 Leg Parlay","payout":"","pick":"Seahawks","game":"KC @ SEA","market":"Moneyline","line":"","odds":"","result":"Win","who":"HTP","ticket":"32:34|Show|6 Leg Parlay"}],"won":4,"lost":2,"push":0,"status":"LOST"},{"ticket":"33:46|Show|Parlay","time":"33:46","source":"Show","bet":"Parlay","pick":"Malik Willis","payout":"$100 to win $4,000 (+4000)","who":"HTP","legs":[{"time":"33:46","source":"Show","bet":"Parlay","payout":"$100 to win $4,000 (+4000)","pick":"Malik Willis","game":"MIA @ NYJ","market":"Rushing Yards","line":"50+","odds":"","result":"Loss","who":"HTP","ticket":"33:46|Show|Parlay"},{"time":"33:46","source":"Show","bet":"Parlay","payout":"$100 to win $4,000 (+4000)","pick":"Tyler Huntley","game":"CIN @ BAL","market":"Rushing Yards","line":"50+","odds":"","result":"Loss","who":"HTP","ticket":"33:46|Show|Parlay"},{"time":"33:46","source":"Show","bet":"Parlay","payout":"$100 to win $4,000 (+4000)","pick":"Christian Watson","game":"GB @ DET","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"33:46|Show|Parlay"}],"won":0,"lost":3,"push":0,"status":"LOST"},{"ticket":"33:52|Show|$500 TD Scorer|Christian Watson","time":"33:52","source":"Show","bet":"$500 TD Scorer","pick":"Christian Watson","payout":"","who":"HTP","legs":[{"time":"33:52","source":"Show","bet":"$500 TD Scorer","payout":"","pick":"Christian Watson","game":"GB @ DET","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"HTP","ticket":"33:52|Show|$500 TD Scorer|Christian Watson"}],"won":0,"lost":1,"push":0,"status":"LOST"},{"ticket":"36:30|Caller: Strider|First TD Scorer","time":"36:30","source":"Caller: Strider","bet":"First TD Scorer","pick":"Woody Marks","payout":"$50, ~+5000","who":"Caller","legs":[{"time":"36:30","source":"Caller: Strider","bet":"First TD Scorer","payout":"$50, ~+5000","pick":"Woody Marks","game":"NYG @ HOU","market":"First TD","line":"","odds":"","result":"Loss","who":"Caller","ticket":"36:30|Caller: Strider|First TD Scorer"},{"time":"36:30","source":"Caller: Strider","bet":"First TD Scorer","payout":"$50, ~+5000","pick":"Bijan Robinson","game":"SF @ ATL","market":"First TD","line":"","odds":"","result":"Loss","who":"Caller","ticket":"36:30|Caller: Strider|First TD Scorer"},{"time":"36:30","source":"Caller: Strider","bet":"First TD Scorer","payout":"$50, ~+5000","pick":"Jahmyr Gibbs","game":"GB @ DET","market":"First TD","line":"","odds":"","result":"Loss","who":"Caller","ticket":"36:30|Caller: Strider|First TD Scorer"}],"won":0,"lost":3,"push":0,"status":"LOST"},{"ticket":"37:19|Caller: Strider|First TD Scorer","time":"37:19","source":"Caller: Strider","bet":"First TD Scorer","pick":"Samaje Perine","payout":"+1100","who":"Caller","legs":[{"time":"37:19","source":"Caller: Strider","bet":"First TD Scorer","payout":"+1100","pick":"Samaje Perine","game":"CIN @ BAL","market":"First TD","line":"","odds":"+1100","result":"Loss","who":"Caller","ticket":"37:19|Caller: Strider|First TD Scorer"}],"won":0,"lost":1,"push":0,"status":"LOST"},{"ticket":"37:33|Caller: Strider|First TD Scorer","time":"37:33","source":"Caller: Strider","bet":"First TD Scorer","pick":"Ollie Gordon II","payout":"","who":"Caller","legs":[{"time":"37:33","source":"Caller: Strider","bet":"First TD Scorer","payout":"","pick":"Ollie Gordon II","game":"MIA @ NYJ","market":"First TD","line":"","odds":"","result":"Loss","who":"Caller","ticket":"37:33|Caller: Strider|First TD Scorer"}],"won":0,"lost":1,"push":0,"status":"LOST"},{"ticket":"37:43|Caller: Strider|Anytime TD","time":"37:43","source":"Caller: Strider","bet":"Anytime TD","pick":"Browns defense","payout":"","who":"Caller","legs":[{"time":"37:43","source":"Caller: Strider","bet":"Anytime TD","payout":"","pick":"Browns defense","game":"CLE @ TEN","market":"Anytime Defensive TD","line":"","odds":"","result":"Loss","who":"Caller","ticket":"37:43|Caller: Strider|Anytime TD"}],"won":0,"lost":1,"push":0,"status":"LOST"},{"ticket":"38:16|Caller: Strider|First TD Scorer","time":"38:16","source":"Caller: Strider","bet":"First TD Scorer","pick":"Chuba Hubbard","payout":"","who":"Caller","legs":[{"time":"38:16","source":"Caller: Strider","bet":"First TD Scorer","payout":"","pick":"Chuba Hubbard","game":"TB @ CAR","market":"First TD","line":"","odds":"","result":"Loss","who":"Caller","ticket":"38:16|Caller: Strider|First TD Scorer"}],"won":0,"lost":1,"push":0,"status":"LOST"},{"ticket":"45:05|Show|Parlay","time":"45:05","source":"Show","bet":"Parlay","pick":"Colts","payout":"+10000","who":"HTP","legs":[{"time":"45:05","source":"Show","bet":"Parlay","payout":"+10000","pick":"Colts","game":"IND @ MIN","market":"Moneyline","line":"","odds":"","result":"Loss","who":"HTP","ticket":"45:05|Show|Parlay"},{"time":"45:05","source":"Show","bet":"Parlay","payout":"+10000","pick":"Falcons","game":"SF @ ATL","market":"Moneyline","line":"","odds":"","result":"Win","who":"HTP","ticket":"45:05|Show|Parlay"},{"time":"45:05","source":"Show","bet":"Parlay","payout":"+10000","pick":"Texans","game":"NYG @ HOU","market":"Moneyline","line":"","odds":"","result":"Loss","who":"HTP","ticket":"45:05|Show|Parlay"},{"time":"45:05","source":"Show","bet":"Parlay","payout":"+10000","pick":"Packers","game":"GB @ DET","market":"Moneyline","line":"","odds":"","result":"Loss","who":"HTP","ticket":"45:05|Show|Parlay"},{"time":"45:05","source":"Show","bet":"Parlay","payout":"+10000","pick":"Seahawks","game":"KC @ SEA","market":"Moneyline","line":"","odds":"","result":"Win","who":"HTP","ticket":"45:05|Show|Parlay"},{"time":"45:05","source":"Show","bet":"Parlay","payout":"+10000","pick":"Raiders","game":"LAR @ LV","market":"Moneyline","line":"","odds":"","result":"Loss","who":"HTP","ticket":"45:05|Show|Parlay"}],"won":2,"lost":4,"push":0,"status":"LOST"},{"ticket":"46:51|Show|Parlay","time":"46:51","source":"Show","bet":"Parlay","pick":"Derrick Henry","payout":"","who":"Team","legs":[{"time":"46:51","source":"Show","bet":"Parlay","payout":"","pick":"Derrick Henry","game":"CIN @ BAL","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"Team","ticket":"46:51|Show|Parlay"},{"time":"46:51","source":"Show","bet":"Parlay","payout":"","pick":"Nico Collins","game":"NYG @ HOU","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"Team","ticket":"46:51|Show|Parlay"},{"time":"46:51","source":"Show","bet":"Parlay","payout":"","pick":"Christian Watson","game":"GB @ DET","market":"Anytime TD","line":"","odds":"","result":"Loss","who":"Team","ticket":"46:51|Show|Parlay"}],"won":0,"lost":3,"push":0,"status":"LOST"},{"ticket":"46:51|Show|Player Prop","time":"46:51","source":"Show","bet":"Player Prop","pick":"C.J. Stroud","payout":"","who":"Team","legs":[{"time":"46:51","source":"Show","bet":"Player Prop","payout":"","pick":"C.J. Stroud","game":"NYG @ HOU","market":"Passing TDs","line":"2+","odds":"","result":"Win","who":"Team","ticket":"46:51|Show|Player Prop"}],"won":1,"lost":0,"push":0,"status":"CASHED"}],"who":[{"who":"HTP","label":"Hold The Phone","won":5,"lost":6,"pending":0,"game":"5-6","tickets":22,"cashed":5},{"who":"Gavin","label":"Gavin","won":0,"lost":0,"pending":0,"game":"0-0","tickets":0,"cashed":0},{"who":"Danny","label":"Danny","won":0,"lost":0,"pending":0,"game":"0-0","tickets":0,"cashed":0},{"who":"Loops","label":"Loops","won":0,"lost":0,"pending":0,"game":"0-0","tickets":0,"cashed":0},{"who":"Team","label":"Team","won":0,"lost":0,"pending":0,"game":"0-0","tickets":2,"cashed":1},{"who":"Caller","label":"Callers","won":0,"lost":0,"pending":0,"game":"0-0","tickets":5,"cashed":0}]},"/api/season":{"who":[{"who":"HTP","label":"Hold The Phone","won":75,"lost":64,"game":"75-64","tickets":310,"cashed":113,"pending":23},{"who":"Gavin","label":"Gavin","won":0,"lost":0,"game":"0-0","tickets":86,"cashed":28,"pending":6},{"who":"Danny","label":"Danny","won":0,"lost":0,"game":"0-0","tickets":36,"cashed":12,"pending":8},{"who":"Loops","label":"Loops","won":0,"lost":0,"game":"0-0","tickets":19,"cashed":6,"pending":1},{"who":"Team","label":"Team","won":0,"lost":0,"game":"0-0","tickets":67,"cashed":34,"pending":0}],"types":[{"type":"SUNDAY","label":"Sunday Best Bets","won":22,"lost":13,"game":"22-13","tickets":87,"cashed":45,"pending":0},{"type":"LIVE","label":"Sunday Livestream","won":22,"lost":20,"game":"22-20","tickets":252,"cashed":57,"pending":8},{"type":"MNF","label":"Monday Night","won":3,"lost":4,"game":"3-4","tickets":37,"cashed":10,"pending":1},{"type":"TNF","label":"Thursday Night","won":5,"lost":4,"game":"5-4","tickets":57,"cashed":12,"pending":9},{"type":"CFB","label":"College Football","won":23,"lost":23,"game":"23-23","tickets":63,"cashed":26,"pending":2},{"type":"EWL","label":"Early Week Leans","won":76,"lost":72,"game":"76-72","tickets":187,"cashed":73,"pending":30}],"ladder":{"bank":40,"climbed":2,"legs_hit":12,"legs":14,"last":{"day":"Day 3","hits":[{"pick":"Amon-Ra St. Brown","line":"50+","market":"Receiving yards","final":"153 rec yds"},{"pick":"Christian Watson","line":"50+","market":"Receiving yards","final":"57 rec yds"}],"legs":4,"pending":0}},"hits":[{"label":"Patrick Mahomes","bet":"First TD Scorer","price":"+3000","type":"MNF"},{"label":"George Holani","bet":"First TD Scorer","price":"+1200","type":"TNF"},{"label":"6 Leg Parlay","bet":"6 Leg Parlay","price":"+1000","type":"SUNDAY"},{"label":"Christian Watson","bet":"First TD Scorer","price":"+750","type":"TNF"},{"label":"George Kittle","bet":"First TD Scorer","price":"+675","type":"MNF"},{"label":"4-Leg Same Game Parlay","bet":"Same Game Parlay","price":"+525","type":"TNF"},{"label":"4-Leg Parlay","bet":"Parlay","price":"+350","type":"LIVE"},{"label":"4-Leg Parlay","bet":"Parlay","price":"+340","type":"SUNDAY"},{"label":"3-Leg Same Game Parlay","bet":"Same Game Parlay","price":"+290","type":"MNF"},{"label":"Kenneth Walker","bet":"First TD Scorers (by game)","price":"+290","type":"LIVE"},{"label":"4-Leg Same Game Parlay","bet":"Same Game Parlay","price":"+230","type":"MNF"},{"label":"Amon-Ra St. Brown","bet":"$500 TD Scorer","price":"+105","type":"SUNDAY"},{"label":"Josh Allen","bet":"First TD Scorer","price":"","type":"TNF"},{"label":"Garrett Wilson","bet":"$500 TD Scorer","price":"","type":"LIVE"},{"label":"49ers -1.5 / Broncos +7.5","bet":"Parlay","price":"","type":"LIVE"},{"label":"Darnell Washington Over 16.5","bet":"Player Prop","price":"","type":"TNF"},{"label":"KC Concepcion Over 3.5","bet":"Player Prop","price":"","type":"TNF"},{"label":"Trey McBride","bet":"$500 TD Scorer","price":"","type":"LIVE"},{"label":"Trey McBride","bet":"$500 TD Scorer","price":"","type":"SUNDAY"},{"label":"Jahmyr Gibbs","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Christian McCaffrey","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Jaxon Smith-Njigba","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Derrick Henry","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Josh Allen","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Devaughn Vele 50+","bet":"Player Prop","price":"","type":"LIVE"},{"label":"DeVonta Smith 50+","bet":"Player Prop","price":"","type":"LIVE"},{"label":"Trey McBride","bet":"Anytime TD","price":"","type":"LIVE"},{"label":"Matthew Golden 1+ TD","bet":"Anytime TD","price":"","type":"TNF"},{"label":"Patrick Mahomes Over 14.5","bet":"Player Prop","price":"","type":"MNF"},{"label":"Jaxson Dart 50+","bet":"Player Prop","price":"","type":"SUNDAY"},{"label":"Josh Allen","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Derrick Henry","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Amon-Ra St. Brown","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Omarion Hampton","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Juwan Johnson Over 38.5","bet":"Player Prop","price":"","type":"MNF"},{"label":"Texas / South Carolina","bet":"Parlay","price":"","type":"CFB"},{"label":"Puka Nacua","bet":"$500 TD Scorer","price":"","type":"LIVE"},{"label":"6 Leg Parlay","bet":"6 Leg Parlay","price":"","type":"LIVE"},{"label":"Dolphins +17 / Titans +17","bet":"Parlay","price":"","type":"LIVE"},{"label":"Amon-Ra St. Brown","bet":"$500 TD Scorer","price":"","type":"LIVE"},{"label":"Christian Watson","bet":"Anytime TD","price":"","type":"LIVE"},{"label":"C.J. Stroud 2+","bet":"Player Prop","price":"","type":"LIVE"},{"label":"Jonathan Taylor","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Kenneth Walker III","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"James Cook III","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Christian McCaffrey","bet":"Anytime TD","price":"","type":"SUNDAY"},{"label":"Stefon Diggs Over 42.5","bet":"Player Prop","price":"","type":"MNF"},{"label":"Puka Nacua","bet":"$500 TD Scorer","price":"","type":"SUNDAY"},{"label":"Kenneth Walker III / Jahmyr Gibbs","bet":"Parlay","price":"","type":"SUNDAY"},{"label":"Garrett Wilson 1+ TD","bet":"$500 TD Scorer","price":"","type":"SUNDAY"}],"primetime":{"won":8,"lost":8,"game":"8-8","tickets":94,"cashed":22,"pending":10,"hits":[{"label":"Patrick Mahomes","bet":"First TD Scorer","price":"+3000","type":"MNF"},{"label":"George Holani","bet":"First TD Scorer","price":"+1200","type":"TNF"},{"label":"Christian Watson","bet":"First TD Scorer","price":"+750","type":"TNF"},{"label":"George Kittle","bet":"First TD Scorer","price":"+675","type":"MNF"},{"label":"4-Leg Same Game Parlay","bet":"Same Game Parlay","price":"+525","type":"TNF"},{"label":"3-Leg Same Game Parlay","bet":"Same Game Parlay","price":"+290","type":"MNF"}]},"episodes":45,"won":75,"lost":64,"game":"75-64","tickets":683,"cashed":223,"pending":50},"/api/odds":[{"start":"2026-10-30T00:15:00Z","kickoff":"THU 8:15 PM ET","live":false,"away":{"name":"Panthers","abbr":"CAR","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/car.png"},"home":{"name":"Packers","abbr":"GB","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/gb.png"},"spread":["+3.5","-3.5"],"total":"47","ml":["+165","-200"]},{"start":"2026-11-01T18:00:00Z","kickoff":"SUN 1:00 PM ET","live":false,"away":{"name":"Cardinals","abbr":"ARI","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/ari.png"},"home":{"name":"Cowboys","abbr":"DAL","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/dal.png"},"spread":["+7","-7"],"total":"54.5","ml":["+260","-300"]},{"start":"2026-11-01T18:00:00Z","kickoff":"SUN 1:00 PM ET","live":false,"away":{"name":"Falcons","abbr":"ATL","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/atl.png"},"home":{"name":"Buccaneers","abbr":"TB","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/tb.png"},"spread":["+2.5","-2.5"],"total":"44.5","ml":["+115","-140"]},{"start":"2026-11-01T18:00:00Z","kickoff":"SUN 1:00 PM ET","live":false,"away":{"name":"Ravens","abbr":"BAL","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/bal.png"},"home":{"name":"Bills","abbr":"BUF","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/buf.png"},"spread":["+3","-3"],"total":"54.5","ml":["+138","-165"]},{"start":"2026-11-01T18:00:00Z","kickoff":"SUN 1:00 PM ET","live":false,"away":{"name":"Browns","abbr":"CLE","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/cle.png"},"home":{"name":"Steelers","abbr":"PIT","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/pit.png"},"spread":["+3.5","-3.5"],"total":"39.5","ml":["+165","-200"]},{"start":"2026-11-01T18:00:00Z","kickoff":"SUN 1:00 PM ET","live":false,"away":{"name":"Colts","abbr":"IND","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/ind.png"},"home":{"name":"Jaguars","abbr":"JAX","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/jax.png"},"spread":["+10","-10"],"total":"46.5","ml":["+400","-525"]},{"start":"2026-11-01T18:00:00Z","kickoff":"SUN 1:00 PM ET","live":false,"away":{"name":"Raiders","abbr":"LV","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/lv.png"},"home":{"name":"Jets","abbr":"NYJ","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/nyj.png"},"spread":["+1.5","-1.5"],"total":"46","ml":["+105","-125"]},{"start":"2026-11-01T18:00:00Z","kickoff":"SUN 1:00 PM ET","live":false,"away":{"name":"Vikings","abbr":"MIN","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/min.png"},"home":{"name":"Lions","abbr":"DET","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/det.png"},"spread":["+3.5","-3.5"],"total":"45.5","ml":["+145","-175"]},{"start":"2026-11-01T18:00:00Z","kickoff":"SUN 1:00 PM ET","live":false,"away":{"name":"Titans","abbr":"TEN","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/ten.png"},"home":{"name":"Bengals","abbr":"CIN","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/cin.png"},"spread":["+11.5","-11.5"],"total":"46.5","ml":["+475","-625"]},{"start":"2026-11-01T21:05:00Z","kickoff":"SUN 4:05 PM ET","live":false,"away":{"name":"Chargers","abbr":"LAC","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/lac.png"},"home":{"name":"Rams","abbr":"LAR","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/lar.png"},"spread":["+6.5","-6.5"],"total":"45","ml":["+240","-295"]},{"start":"2026-11-01T21:25:00Z","kickoff":"SUN 4:25 PM ET","live":false,"away":{"name":"Chiefs","abbr":"KC","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/kc.png"},"home":{"name":"Broncos","abbr":"DEN","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/den.png"},"spread":["-1.5","+1.5"],"total":"40.5","ml":["-120","+100"]},{"start":"2026-11-01T21:25:00Z","kickoff":"SUN 4:25 PM ET","live":false,"away":{"name":"Patriots","abbr":"NE","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/ne.png"},"home":{"name":"Dolphins","abbr":"MIA","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/mia.png"},"spread":["-7","+7"],"total":"43","ml":["-325","+260"]},{"start":"2026-11-02T01:20:00Z","kickoff":"SUN 8:20 PM ET","live":false,"away":{"name":"Eagles","abbr":"PHI","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/phi.png"},"home":{"name":"Commanders","abbr":"WSH","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/wsh.png"},"spread":["+6","-6"],"total":"40","ml":["+220","-275"]},{"start":"2026-11-03T01:15:00Z","kickoff":"MON 8:15 PM ET","live":false,"away":{"name":"Bears","abbr":"CHI","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/chi.png"},"home":{"name":"Seahawks","abbr":"SEA","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/sea.png"},"spread":["+3","-3"],"total":"46.5","ml":["+145","-175"]}],"/api/news":[{"headline":"Seahawks' dominant defense faces challenge in Bears QB Caleb Williams and NFL's top rushing offense","description":"Now it's Chicago's turn to face Seattle's \u201cDark Side.\u201d","published":"2026-10-29T20:46:47Z","image":"https://s.espncdn.com/stitcher/sports/football/nfl/events/401873036.png?templateId=espn.applewatch.awayhome.1"},{"headline":"Toub: Butker still Chiefs' kicker despite struggles, Tucker signing","description":"Chiefs special teams coordinator Dave Toub expressed rather emphatically that Harrison Butker is the team's kicker despite the team signing Justin Tucker, who hasn't played in the NFL since 2024, to their practice squad.","published":"2026-10-29T20:39:50Z","image":"https://a.espncdn.com/photo/2024/0520/r1335483_600x400_3-2.jpg"},{"headline":"NFL Week 8 uniforms: Jaguars, Lions become latest team to debut Rivalries look","description":"Here's a look at what each NFL team is wearing in Week 8, led by Rivalries looks from Jacksonville and Detroit.","published":"2026-10-29T19:57:50Z","image":"https://a.espncdn.com/photo/2026/1028/16x9.jpg"},{"headline":"Longtime football coach June Jones, pioneer of run-and-shoot offense, dies at 73","description":"Longtime college and pro football coach June Jones, who helped popularize the run-and-shoot offense, has died at 73.","published":"2026-10-29T21:05:25Z","image":"https://a.espncdn.com/photo/2026/1029/r1738213_1296x729_16-9.jpg"},{"headline":"Patriots' A.J. Brown misses practice Thursday due to new knee ailment","description":"The Patriots' A.J. Brown missed his first practice since returning from IR, with a new knee ailment in addition to his previously injured ankle.","published":"2026-10-29T20:47:25Z","image":"https://a.espncdn.com/photo/2026/1029/r1738224_1296x729_16-9.jpg"},{"headline":"Raiders and Jets will try to stop struggles and quiet some outside noise when they square off Sunday","description":"\u2014 Las Vegas Raiders fans are getting restless, while New York Jets fans are fully frustrated.","published":"2026-10-29T18:18:47Z","image":"https://s.espncdn.com/stitcher/sports/football/nfl/events/401873029.png?templateId=espn.applewatch.awayhome.1"},{"headline":"In Pittsburgh, the Browns chase a rare win and sole possession of the AFC North lead","description":"\u2014 Time to find out if the Cleveland Browns are for real.","published":"2026-10-29T17:45:48Z","image":"https://s.espncdn.com/stitcher/sports/football/nfl/events/401873027.png?templateId=espn.applewatch.awayhome.1"},{"headline":"Dolphins look to build momentum against defending AFC champion Patriots as Willis faces former coach","description":"\u2014 Most of the current players on the Miami Dolphins roster haven't faced the New England Patriots very much.","published":"2026-10-29T17:45:47Z","image":"https://s.espncdn.com/stitcher/sports/football/nfl/events/401873034.png?templateId=espn.applewatch.awayhome.1"}],"/api/insights":{"cards":[{"game":"Carolina Panthers @ Green Bay Packers","kickoff":"THU 8:15 PM ET","live":false,"spread":["+3.5","-3.5"],"spread_prices":{"away":{"line":"+3.5","price":"-102"},"home":{"line":"-3.5","price":"-108"}},"total":"47","total_prices":{"over":{"line":"47","price":"-110"},"under":{"line":"47","price":"-108"}},"moneyline":["+165","-200"],"move":null,"away":{"team":"Carolina Panthers","abbr":"CAR","games":6,"record":"3-3","home":"1-2","road":"2-1","points_for":26.5,"points_against":27.7,"avg_margin":-1.2,"avg_game_total":54.2,"last5":["@ ATL W 34-3","@ CLE L 18-21","vs DET W 32-26","@ PHI W 25-14","vs TB L 13-43"],"vs_this_spread":{"line":3.5,"would_have_covered":4,"pushed":0,"of":6},"vs_this_total":{"line":47.0,"over":3,"under":3,"of":6},"logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/car.png"},"home":{"team":"Green Bay Packers","abbr":"GB","games":7,"record":"4-3","home":"2-1","road":"2-2","points_for":20.6,"points_against":20.7,"avg_margin":-0.1,"avg_game_total":41.3,"last5":["vs ATL L 14-35","@ TB W 17-14","vs CHI W 31-7","vs DAL W 23-13","@ DET L 17-20"],"vs_this_spread":{"line":-3.5,"would_have_covered":2,"pushed":0,"of":7},"vs_this_total":{"line":47.0,"over":2,"under":5,"of":7},"logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/gb.png"},"pick":{"side":"GB","label":"PACKERS -4","who":"HTP","show":"Thursday Night Football","bet":"Game Pick"},"facts":[{"tag":"HOLD THE PHONE","text":"Hold The Phone is 4-3 picking against the Panthers this season"},{"tag":"DEFENSE","text":"The Packers have allowed 14 or fewer in 3 of their last 4"},{"tag":"PLAYER TREND","text":"Jordan Love has thrown 2+ TDs in 7 of his last 10"},{"tag":"PLAYER TREND","text":"Christian Watson has scored a TD in 6 of his last 10"}]}],"focus":{"game":"Panthers @ Packers","away":{"name":"Panthers","abbr":"CAR","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/car.png"},"home":{"name":"Packers","abbr":"GB","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/gb.png"},"kickoff":"THU 8:15 PM ET","spread":["+3.5","-3.5"],"total":"47","ml":["+165","-200"],"night":"THURSDAY NIGHT"},"moves":[{"game":"Panthers @ Packers","away":{"name":"Panthers","abbr":"CAR","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/car.png"},"home":{"name":"Packers","abbr":"GB","logo":"https://a.espncdn.com/i/teamlogos/nfl/500-dark/gb.png"},"since":"2026-10-29T11:28","kickoff":"THU 8:15 PM ET"}],"trends":[{"player":"John Metchie III","team":"CAR","stat":"REC YDS","side":"OVER","line":14.5,"hits":8,"of":10,"price":"-135","avg":22.4,"game":"Carolina Panthers @ Green Bay Packers","headshot":"https://a.espncdn.com/i/headshots/nfl/players/full/4567096.png"},{"player":"John Metchie III","team":"CAR","stat":"REC","side":"OVER","line":1.5,"hits":8,"of":10,"price":"-135","avg":2.4,"game":"Carolina Panthers @ Green Bay Packers","headshot":"https://a.espncdn.com/i/headshots/nfl/players/full/4567096.png"},{"player":"Savion Williams","team":"GB","stat":"REC","side":"UNDER","line":2.5,"hits":8,"of":10,"price":"-105","avg":1.3,"game":"Carolina Panthers @ Green Bay Packers","headshot":"https://a.espncdn.com/i/headshots/nfl/players/full/4431487.png"}],"updated":"2:18 PM"},"/api/dayfacts":[{"tag":"VS THE NUMBER","text":"The Packers would have covered -4 in 2 of 7 games this season","game":"CAR @ GB","kickoff":"THU 8:15 PM ET","pick":null},{"tag":"VS THE NUMBER","text":"The Cowboys would have covered -7 in 2 of 7 games this season","game":"ARI @ DAL","kickoff":"SUN 1:00 PM ET","pick":null},{"tag":"VS THE NUMBER","text":"The Buccaneers would have covered -2.5 in 2 of 7 games this season","game":"ATL @ TB","kickoff":"SUN 1:00 PM ET","pick":null},{"tag":"LOSS STREAK","text":"The Ravens have lost 2 straight","game":"BAL @ BUF","kickoff":"SUN 1:00 PM ET","pick":null},{"tag":"WIN STREAK","text":"The Steelers have won 3 straight","game":"CLE @ PIT","kickoff":"SUN 1:00 PM ET","pick":null},{"tag":"LOSS STREAK","text":"The Colts have lost 3 straight","game":"IND @ JAX","kickoff":"SUN 1:00 PM ET","pick":null},{"tag":"LOSS STREAK","text":"The Raiders have lost 4 straight","game":"LV @ NYJ","kickoff":"SUN 1:00 PM ET","pick":null},{"tag":"WIN STREAK","text":"The Vikings have won 6 straight","game":"MIN @ DET","kickoff":"SUN 1:00 PM ET","pick":null},{"tag":"WIN STREAK","text":"The Bengals have won 2 straight","game":"TEN @ CIN","kickoff":"SUN 1:00 PM ET","pick":null},{"tag":"DEFENSE","text":"The Packers have allowed 14 or fewer in 3 of their last 4","game":"CAR @ GB","kickoff":"THU 8:15 PM ET","pick":null},{"tag":"DEFENSE","text":"The Cardinals have allowed 30+ in 3 of their last 4","game":"ARI @ DAL","kickoff":"SUN 1:00 PM ET","pick":null},{"tag":"HOME","text":"The Buccaneers are 0-4 at home this season","game":"ATL @ TB","kickoff":"SUN 1:00 PM ET","pick":null},{"tag":"LAST MEETING","text":"Panthers won the last meeting 16-13 (2025)","game":"CAR @ GB","kickoff":"THU 8:15 PM ET","pick":null},{"tag":"LAST MEETING","text":"Cardinals won the last meeting 27-17 (2025)","game":"ARI @ DAL","kickoff":"SUN 1:00 PM ET","pick":null},{"tag":"HOLD THE PHONE","text":"Hold The Phone is 2-1 on Falcons game picks this season","game":"ATL @ TB","kickoff":"SUN 1:00 PM ET","pick":null}],"/api/cash":[]};</script>
+<style>#webnav{margin-left:auto;flex-shrink:0;display:flex;gap:5.4px}header .logo{white-space:nowrap;flex-shrink:0}.wrap{grid-template-columns:minmax(0,1fr)!important}header,main{min-width:0}.hdr-mid{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#clock{display:none}#webnav a{font:700 15.66px "Helvetica Neue",Arial,sans-serif;letter-spacing:0.864px;text-transform:uppercase;color:#f4f6ff;text-decoration:none;padding:7.56px 11.34px;border-radius:10.8px;background:rgba(7,10,28,.55);border:2.16px solid rgba(255,255,255,.18)}#webnav a.on{background:#f2b705;color:#070a1c;border-color:#f2b705}#webstamp{position:fixed;bottom:4.32px;right:10.8px;z-index:50;font:600 14.04px Arial;color:#9aa3d6;opacity:.8}</style><div id="webstamp">Updated Oct 29, 2026 · 2:19 PM PT</div><script>(function(){var q=location.search||"?view=rotate&pane=picks";[].forEach.call(document.querySelectorAll("#webnav a"),function(a){if(a.getAttribute("href")===q)a.className="on";});})();</script>
+<script>
+  var view = (location.search.match(/view=(\w+)/) || [])[1] || 'rotate';
+  if (view === 'rotate' && !/[?&]pane=/.test(location.search)) history.replaceState(null, '', '?view=rotate&pane=picks');
+  document.body.className = 'v-' + view;
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function get(url, cb) { if (window.SNAP) { var v = SNAP[url]; if (v !== undefined) setTimeout(function () { cb(v); }, 0); return; } var x = new XMLHttpRequest(); x.onload = function () { try { cb(JSON.parse(x.responseText)); } catch (e) {} }; x.open('GET', url + '?t=' + Date.now()); x.send(); }
+  var PICKS = {tickets: []};
+
+  function clock() { var d = new Date(), h = d.getHours(), m = d.getMinutes();
+    document.getElementById('clock').textContent = ((h + 11) % 12 + 1) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM'); }
+
+  function legsForGame(g) {   // our legs whose game is this one (by "AWY @ HOM" or by team nickname in the pick)
+    var out = [], key1 = g.away.abbr + ' @ ' + g.home.abbr, names = [g.away.name, g.home.name];
+    PICKS.tickets.forEach(function (t) { t.legs.forEach(function (p) {
+      if (p.game === key1 || (!p.game && names.indexOf(p.pick) >= 0) || (p.game === '' && names.some(function (n) { return p.pick.indexOf(n) === 0; })))
+        if (t.source === 'Show') out.push({txt: p.pick + ' ' + (p.line && p.line !== 'ML' ? p.line : p.market === 'Moneyline' || p.line === 'ML' ? 'ML' : p.market), result: p.result});
+    }); });
+    var seen = {};   // one chip per pick (a game pick and a parlay leg on the same side read as one)
+    return out.filter(function (o) { var k = o.txt + '|' + o.result; if (seen[k]) return false; seen[k] = 1; return true; });
+  }
+
+  var GAMES = [];
+  function drawScores(games) {
+    GAMES = games; var box = document.getElementById('games'); box.innerHTML = '';
+    if (!games.length) { box.appendChild(el('div', 'empty', 'No games today')); return; }
+    games.forEach(function (g) {
+      var c = el('div', 'g' + (g.state === 'in' ? ' live' : ''));
+      var a = +g.away.score || 0, h = +g.home.score || 0;
+      [['away', a < h], ['home', h < a]].forEach(function (s) {
+        var t = g[s[0]], r = el('div', 'row' + (g.state === 'post' && s[1] ? ' lose' : ''));
+        var img = el('img'); img.src = t.logo; r.appendChild(img);
+        var nm = el('div', 'tm' + (g.possession === t.id ? ' pos' : ''), t.name); nm.appendChild(el('small', null, t.record)); r.appendChild(nm);
+        r.appendChild(el('div', 'sc', g.state === 'pre' ? '' : t.score)); c.appendChild(r);
+      });
+      var st = el('div', 'st'); st.appendChild(el('span', g.state === 'in' ? 'live' : '', g.detail));
+      st.appendChild(el('span', null, g.state === 'in' ? g.down : g.broadcast)); c.appendChild(st);
+      var ours = legsForGame(g);
+      if (ours.length) { var ch = el('div', 'chips'); ours.forEach(function (o) { ch.appendChild(el('span', 'chip ' + o.result, o.txt)); }); c.appendChild(ch); }
+      box.appendChild(c);
+    });
+  }
+
+  function drawPicks(d) {
+    PICKS = d; checkCashes(d.tickets || []);
+    var s = d.show || {}, rot = view === 'rotate';
+    if (document.body.classList.contains('pane-picks') || !rot) document.getElementById('hdr').textContent = rot ? (s.week ? 'NFL Week ' + s.week : '') : [s.name, s.show, s.week ? 'NFL Week ' + s.week : ''].filter(Boolean).join('  ·  ');
+    var ppl = document.getElementById('people'); ppl.innerHTML = '';
+    (d.who || []).filter(function (w) { return w.who === 'HTP'; }).forEach(function (w) {   // TV: show record only (hosts' records live on the dashboard)
+      var p = el('div', 'p ' + w.who);
+      if (w.who === 'HTP') {
+        var l = el('div'); l.appendChild(el('div', 'nm', w.label)); l.appendChild(el('div', 'sub', rot ? 'Game picks  ·  NFL Week ' + (s.week || '') : 'Game picks ' + w.game + '  ·  ' + w.cashed + ' of ' + w.tickets + ' cashed'));
+        p.appendChild(l); p.appendChild(el('div', 'big', w.won + '-' + w.lost));
+      } else {
+        p.appendChild(el('div', 'nm', w.label)); p.appendChild(el('div', 'big', w.won + '-' + w.lost));
+        p.appendChild(el('div', 'sub', w.who === 'Caller' ? w.tickets + ' tickets · ' + w.cashed + ' cashed' : 'game picks · ' + w.cashed + ' of ' + w.tickets + ' bets cashed'));
+      }
+      ppl.appendChild(p);
+    });
+    var box = document.getElementById('tix'); box.innerHTML = '';
+    var show = (d.tickets || []).filter(function (t) { return t.source === 'Show'; });
+    var rank = {CASHED: 0, OPEN: 1, PUSH: 2, LOST: 3};
+    show.sort(function (a, b) { return rank[a.status] - rank[b.status]; });
+    if (!show.length) box.appendChild(el('div', 'empty', 'Picks show up here as they are called on the show.'));
+    show.forEach(function (t) {
+      var c = el('div', 't ' + t.status), hd = el('div', 'th');
+      hd.appendChild(el('span', 'tag ' + t.who, t.who === 'HTP' ? 'HTP' : t.who));
+      var lbl = t.bet === 'Game Pick' ? t.pick + ' ' + (t.legs[0].line || '') : t.bet + (t.payout && t.payout.charAt(0) === '+' ? ' ' + t.payout : '');
+      hd.appendChild(el('span', 'lbl', lbl)); hd.appendChild(el('span', 'pill ' + t.status, t.status === 'OPEN' ? 'OPEN' : t.status));
+      c.appendChild(hd);
+      if (t.legs.length > 1 || t.bet !== 'Game Pick') {
+        var lg = el('div', 'legs');
+        t.legs.forEach(function (p) { lg.appendChild(el('span', 'leg ' + p.result, p.pick + (p.line && p.line !== 'ML' ? ' ' + p.line : p.line === 'ML' ? ' ML' : ''))); });
+        c.appendChild(lg);
+      }
+      box.appendChild(c);
+    });
+    scrollSetup();
+    if (GAMES.length) drawScores(GAMES);   // re-draw score cards so their pick chips match the latest picks
+  }
+
+  function drawRecords(d) {   // every record: HTP, primetime, ladder, each show type, each caller (push counts as a win in the data)
+    var top = document.getElementById('r-top'); top.innerHTML = '';
+    var htp = (d.who || []).filter(function (w) { return w.who === 'HTP'; })[0] || d;
+    var card = function (cls, nm, big, sub) { var c = el('div', cls); c.appendChild(el('div', 'nm', nm)); c.appendChild(el('div', 'big', big)); c.appendChild(el('div', 'sub', sub)); return c; };
+    top.appendChild(card('main', 'Hold The Phone · 2026 season', htp.won + '-' + htp.lost, 'game picks  ·  ' + htp.cashed + ' of ' + htp.tickets + ' bets cashed  ·  ' + d.episodes + ' episodes + live shows'));
+    var P = d.primetime || {}; top.appendChild(card('', 'TNF + MNF', P.game || '-', (P.cashed || 0) + ' of ' + (P.tickets || 0) + ' bets cashed'));
+    var L = d.ladder || {}; top.appendChild(card('', '$10 Ladder', '$10 → $' + (L.bank || 10).toLocaleString(), (L.legs_hit || 0) + '/' + (L.legs || 0) + ' legs hit  ·  ' + (L.climbed || 0) + ' rungs'));
+    var pct = function (t) { return t.won + t.lost ? t.won / (t.won + t.lost) : 0; };
+    var ty = document.getElementById('r-types'); ty.innerHTML = '';
+    (d.types || []).slice().sort(function (a, b) { return pct(b) - pct(a); }).forEach(function (t) { ty.appendChild(card(t.won > t.lost ? 'win' : '', t.label, t.game, t.cashed + '/' + t.tickets + ' bets cashed')); });
+    var wh = document.getElementById('r-who'); wh.innerHTML = '';
+    (d.who || []).filter(function (w) { return w.who !== 'HTP' && (w.won + w.lost || w.tickets); }).sort(function (a, b) { return pct(b) - pct(a); })
+      .forEach(function (w) {   // callers make prop / parlay / TD calls, not game picks: lead with what cashed
+        if (w.won + w.lost) wh.appendChild(card(w.won > w.lost ? 'win' : '', w.label, w.game, w.cashed + '/' + w.tickets + ' bets cashed'));
+        else wh.appendChild(card(w.cashed ? 'win' : '', w.label, w.cashed + ' cashed', 'of ' + w.tickets + ' bets called'));
+      });
+    if (document.body.classList.contains('pane-records')) document.getElementById('hdr').textContent = '2026 season records  ·  every show, every caller';
+  }
+  function drawSeason(d) {
+    SEASON = d; drawRecords(d); if (document.body.classList.contains('pane-prime')) { drawPrime(d); return; }
+    if (!document.body.classList.contains('pane-season') && view !== 'season') return;
+    document.getElementById('hdr').textContent = '2026 season  ·  Every show  ·  ' + d.episodes + ' episodes + live shows';
+    var ppl = document.getElementById('s-people'); ppl.innerHTML = '';
+    (d.who || []).filter(function (w) { return w.who === 'HTP'; }).forEach(function (w) {
+      var p = el('div', 'p ' + w.who);
+      if (w.who === 'HTP') {
+        var l = el('div'); l.appendChild(el('div', 'nm', 'Hold The Phone · season')); l.appendChild(el('div', 'sub', 'Game picks ' + w.game + '  ·  ' + w.cashed + ' of ' + w.tickets + ' bets cashed  ·  record = game picks'));
+        p.appendChild(l); p.appendChild(el('div', 'big', w.won + '-' + w.lost));
+      } else {
+        p.appendChild(el('div', 'nm', w.label)); p.appendChild(el('div', 'big', w.won + '-' + w.lost));
+        p.appendChild(el('div', 'sub', 'game picks  ·  ' + w.cashed + ' of ' + w.tickets + ' bets cashed'));
+      }
+      ppl.appendChild(p);
+    });
+    var ty = document.getElementById('s-types'); ty.innerHTML = '';
+    var pct = function (t) { return t.won + t.lost ? t.won / (t.won + t.lost) : 0; };
+    (d.types || []).slice().sort(function (a, b) { return pct(b) - pct(a); }).forEach(function (t) {   // TV: every split, best first; winning ones big
+      var c = el('div', 'ty' + (t.won > t.lost ? ' win' : '')); c.appendChild(el('div', 'nm', t.label)); c.appendChild(el('div', 'big', t.game));
+      c.appendChild(el('div', 'sub', 'game picks  ·  ' + t.cashed + '/' + t.tickets + ' cashed')); ty.appendChild(c);
+    });
+    var L = d.ladder || {}, lb = document.getElementById('s-ladder'); lb.innerHTML = '';
+    if (L.legs) {
+      var a = el('div'); a.appendChild(el('div', 'nm', '$10 → $10,000 Ladder')); a.appendChild(el('div', 'sub', L.legs_hit + '/' + L.legs + ' legs hit  ·  ' + L.climbed + ' rungs climbed'));
+      var lt = L.last || {}, hh = el('div', 'lhits');   // lead with the wins: the latest day's legs that hit
+      if ((lt.hits || []).length) { hh.appendChild(el('span', '', lt.day + ' hits')); lt.hits.forEach(function (h) { hh.appendChild(el('span', '', '✓ ' + h.pick + (h.final ? ' · ' + h.final : ' ' + h.line))); }); a.appendChild(hh); }
+      lb.appendChild(a); lb.appendChild(el('div', 'big', '$10 → $' + L.bank.toLocaleString()));
+      var r = el('div', 'rungs'); for (var i = 0; i < 10; i++) r.appendChild(el('i', i < L.climbed ? 'on' : '')); lb.appendChild(r);
+    } else lb.style.display = 'none';
+  }
+  var TYPE_NAME = {SUNDAY: 'Sunday', MNF: 'MNF', TNF: 'TNF', CFB: 'CFB', LIVE: 'Livestream'};
+  function drawHits(box, hits) {
+    box.innerHTML = '';
+    (hits || []).forEach(function (h) {
+      var c = el('div', 'hit'); c.appendChild(el('div', 'pr', h.price || '✓ CASHED'));
+      c.appendChild(el('div', 'lb', h.label)); var bt = el('div', 'bt'); bt.appendChild(el('b', null, TYPE_NAME[h.type] || h.type));
+      bt.appendChild(document.createTextNode(h.bet + ' · cashed')); c.appendChild(bt); box.appendChild(c);
+    });
+  }
+  function drawPrime(d) {
+    var P = d.primetime || {}; document.getElementById('hdr').textContent = 'Primetime  ·  TNF + MNF  ·  2026 season';
+    var r = document.getElementById('p-rec'); r.innerHTML = '';
+    var p = el('div', 'p HTP'), l = el('div'); l.appendChild(el('div', 'nm', 'Primetime game picks'));
+    l.appendChild(el('div', 'sub', P.cashed + ' primetime bets cashed  ·  SGPs, first TDs & props'));
+    p.appendChild(l); p.appendChild(el('div', 'big', P.game || '—')); r.appendChild(p);
+    drawHits(document.getElementById('s-hits'), d.hits);
+    document.getElementById('s-hits-h').textContent = 'Every big cash this season · ' + (d.hits || []).length + ' plus-money cashes';
+    hy = 0; hdir = 1; hpause = 90;
+  }
+  var DAYF = [], DAYI = 0;
+  function nextFact() {
+    if (!DAYF.length) return; var f = DAYF[DAYI % DAYF.length], bar = document.getElementById('factbar');
+    document.getElementById('fb-tag').textContent = f.tag; document.getElementById('fb-game').textContent = f.game + (f.pick ? '  ·  our pick ' + f.pick : '');
+    document.getElementById('fb-txt').textContent = f.text; document.getElementById('fb-n').textContent = (DAYI % DAYF.length + 1) + ' / ' + DAYF.length;
+    bar.classList.add('on'); bar.classList.remove('swap'); void bar.offsetWidth; bar.classList.add('swap'); DAYI++;
+  }
+  function gotFacts(d) { var first = !DAYF.length; DAYF = d || []; if (first) nextFact(); }
+  if (view === 'rotate') { get('/api/dayfacts', gotFacts); setInterval(nextFact, 9000); setInterval(function () { get('/api/dayfacts', gotFacts); }, 600000); }
+  var ODDS = [], NEWS = [], INS = null, OPAGE = 0, OPER = 6, OTIMER = null;
+  var IPAGE = 0, ITIMER = null;
+  function trendLine(team, sp, tot) {   // the 2 numbers that matter for the pick
+    var out = [];
+    if (team.vs_this_spread) out.push({ t: team.abbr + ' covers ' + (sp > 0 ? '+' : '') + sp, v: team.vs_this_spread.would_have_covered + ' of ' + team.vs_this_spread.of + (team.vs_this_spread.pushed ? ' (' + team.vs_this_spread.pushed + ' push)' : ''),
+                                      good: team.vs_this_spread.would_have_covered / team.vs_this_spread.of >= 0.6 });
+    if (team.vs_this_total) out.push({ t: team.abbr + ' games over ' + tot, v: team.vs_this_total.over + ' of ' + team.vs_this_total.of, good: team.vs_this_total.over / team.vs_this_total.of >= 0.6 || team.vs_this_total.under / team.vs_this_total.of >= 0.67 });
+    return out;
+  }
+  function gameCard(c, big) {
+    var w = el('div', 'gp' + (big ? ' big' : '')), top = el('div', 'gp-top');
+    [c.away, null, c.home].forEach(function (t, i) {
+      if (!t) { var m = el('div', 'gp-mid'); m.appendChild(el('div', 'gp-ko', (c.live ? 'LIVE · ' : '') + c.kickoff));
+        var ln = el('div', 'gp-lines'), sp = c.spread_prices || {}, tp = c.total_prices || {};
+        [['SPREAD', c.spread ? c.away.abbr + ' ' + c.spread[0] : '—', sp.away ? sp.away.price + ' / ' + (sp.home ? sp.home.price : '') : ''],
+         ['TOTAL', c.total ? 'O/U ' + c.total : '—', tp.over ? 'O ' + tp.over.price + '  U ' + tp.under.price : ''],
+         ['MONEY', c.moneyline ? c.moneyline[0] + ' / ' + c.moneyline[1] : '—', '']].forEach(function (x) { var d = el('div'); d.appendChild(el('small', null, x[0])); d.appendChild(el('strong', null, x[1])); if (x[2]) d.appendChild(el('em', null, x[2])); ln.appendChild(d); });
+        m.appendChild(ln); if (c.move) m.appendChild(el('div', 'gp-move', 'LINE MOVE  ' + c.away.abbr + ' ' + c.move.open + ' → ' + c.move.now));
+        top.appendChild(m); return; }
+      var tm = el('div', 'gp-team' + (i ? ' h' : '')), im = el('img'); im.src = t.logo; var nm = el('div');
+      nm.appendChild(el('b', null, t.team.split(' ').slice(-1)[0])); nm.appendChild(el('span', null, t.record + '  ·  ' + (i ? 'home ' + t.home : 'road ' + t.road)));
+      if (i) { tm.appendChild(nm); tm.appendChild(im); } else { tm.appendChild(im); tm.appendChild(nm); } top.appendChild(tm);
+    });
+    w.appendChild(top);
+    if (c.pick) { var pb = el('div', 'gp-pick'); pb.appendChild(el('span', 'gp-pick-tag', 'OUR PICK')); pb.appendChild(el('span', 'gp-pick-txt', c.pick.label));
+      pb.appendChild(el('span', 'gp-pick-src', (c.pick.who && c.pick.who !== 'HTP' ? c.pick.who + ' · ' : '') + (c.pick.show || ''))); w.appendChild(pb); }
+    var st = el('div', 'gp-stats'), spA = c.spread ? parseFloat(String(c.spread[0]).replace('PK', '0')) : null, spH = c.spread ? parseFloat(String(c.spread[1]).replace('PK', '0')) : null;
+    trendLine(c.away, spA, c.total).concat(trendLine(c.home, spH, c.total)).forEach(function (x) { var d = el('div', 'gp-stat' + (x.good ? ' good' : '')); d.appendChild(el('strong', null, x.v)); d.appendChild(el('span', null, x.t)); st.appendChild(d); });
+    [[c.away, 'margin'], [c.home, 'margin']].forEach(function (x) { var t = x[0], d = el('div', 'gp-stat'); d.appendChild(el('strong', null, (t.avg_margin > 0 ? '+' : '') + t.avg_margin)); d.appendChild(el('span', null, t.abbr + ' avg margin · ' + t.points_for + ' scored')); st.appendChild(d); });
+    w.appendChild(st);
+    if ((c.facts || []).length) {   // lower-third style fact bars
+      var fx = el('div', 'gp-facts');
+      c.facts.slice(0, 3).forEach(function (f) {   /* 3 bars: a 4th (or a 2-line one) runs off the bottom */ var b = el('div', 'lt'); b.appendChild(el('span', 'lt-tag', f.tag)); b.appendChild(el('span', 'lt-txt', f.text)); fx.appendChild(b); });
+      w.appendChild(fx);
+    }
+    return w;
+  }
+  function drawInsights(d) {
+    INS = d || INS; if (!INS || !document.body.classList.contains('pane-insights')) return;
+    var F = INS.focus, cards = INS.cards || [], per = 1, pages = Math.max(1, Math.ceil(cards.length / per)); IPAGE = IPAGE % pages;
+    document.getElementById('hdr').textContent = F ? F.night + "  ·  GAME PICK BREAKDOWN" : "Today's insights  ·  game picks  ·  BetMGM" + (pages > 1 ? '  ·  ' + (IPAGE + 1) + ' of ' + pages : '');
+    var box = document.getElementById('ins-games'); box.innerHTML = '';
+    if (!cards.length) { box.appendChild(el('div', 'empty', 'Game cards show here once BetMGM posts this week\u2019s lines.')); return; }
+    cards.slice(IPAGE * per, IPAGE * per + per).forEach(function (c) { box.appendChild(gameCard(c, true)); });
+    var tg = document.getElementById('ins-trends'); tg.innerHTML = '';
+    (INS.trends || []).filter(function (t) { return t.side === 'OVER'; }).slice(0, 0).forEach(function (t) {
+      var c = el('div', 'tr'); var im = el('img'); im.src = t.headshot; im.onerror = function () { im.style.visibility = 'hidden'; }; c.appendChild(im);
+      c.appendChild(el('div', 'nm', t.player)); var rt = el('div', 'rt'); rt.appendChild(el('b', null, t.hits + '/' + t.of)); c.appendChild(rt);
+      var bt = el('div', 'bt'); bt.appendChild(el('span', t.side, t.side + ' ' + t.line + ' ' + t.stat)); bt.appendChild(document.createTextNode('  ·  ' + (t.price || ''))); c.appendChild(bt); tg.appendChild(c);
+    });
+    document.getElementById('ins-tr-h').hidden = !tg.childNodes.length;
+  }
+  function drawOdds(d) {
+    ODDS = d || []; if (!document.body.classList.contains('pane-odds')) return;
+    var pages = Math.max(1, Math.ceil(ODDS.length / OPER)); OPAGE = OPAGE % pages;
+    document.getElementById('hdr').textContent = 'This week  ·  BetMGM lines  ·  ' + ODDS.length + ' games' + (pages > 1 ? '  ·  ' + (OPAGE + 1) + ' of ' + pages : '');
+    var box = document.getElementById('o-games'); box.innerHTML = '';
+    if (!ODDS.length) { box.appendChild(el('div', 'empty', 'Lines post here as BetMGM opens them.')); return; }
+    ODDS.slice(OPAGE * OPER, OPAGE * OPER + OPER).forEach(function (g) {
+      var c = el('div', 'od' + (g.live ? ' live' : '')), tms = el('div', 'tms');
+      [g.away, g.home].forEach(function (t, i) { var r = el('div', 't'); var im = el('img'); im.src = t.logo; r.appendChild(im); r.appendChild(document.createTextNode((i ? '' : '') + t.name)); tms.appendChild(r); });
+      tms.appendChild(el('div', 'ko', g.live ? 'LIVE' : g.kickoff)); c.appendChild(tms);
+      [['SPREAD', g.spread], ['TOTAL', g.total ? ['O ' + g.total, 'U ' + g.total] : null], ['MONEY', g.ml]].forEach(function (k) {
+        var col = el('div', 'col'); col.appendChild(el('b', null, k[0]));
+        (k[1] || ['—', '—']).forEach(function (v) { col.appendChild(el('span', null, v)); }); c.appendChild(col);
+      });
+      box.appendChild(c);
+    });
+  }
+  function ago(t) { var m = Math.max(1, Math.round((Date.now() - Date.parse(t)) / 60000)); return m < 60 ? m + ' min ago' : Math.round(m / 60) + ' hr ago'; }
+  function drawNews(d) {
+    NEWS = d || []; if (!document.body.classList.contains('pane-news')) return;
+    document.getElementById('hdr').textContent = 'NFL news  ·  latest';
+    var box = document.getElementById('n-list'); box.innerHTML = '';
+    NEWS.slice(0, 6).forEach(function (a) {
+      var c = el('div', 'nw'); if (a.image) { var im = el('img'); im.src = a.image; c.appendChild(im); } else c.style.gridTemplateColumns = '1fr';
+      var tx = el('div', 'tx'); tx.appendChild(el('div', 'hd', a.headline)); if (a.description && a.description !== a.headline) tx.appendChild(el('div', 'ds', a.description));
+      tx.appendChild(el('div', 'ag', ago(a.published))); c.appendChild(tx); box.appendChild(c);
+    });
+  }
+  var SEASON = null;
+  if (view === 'rotate') {   // live picks for 30 s, then the season for 20 s
+    var pane = 'news';   // the last pane, so the first flip lands on picks
+    document.body.className = 'v-rotate pane-picks' + (/[?&]bets=1/.test(location.search) ? ' bets' : '');
+    var ORDER = ['picks', 'insights', 'season', 'prime', 'odds', 'news'];
+    var FLIPT = null, FIXED = (location.search.match(/[?&]pane=(\w+)/) || [])[1];
+    window.showPane = function (p) { FIXED = p; flip(); };
+    function flip() {   // always book the next flip first, so one screen erroring can never freeze the rotation
+      clearTimeout(FLIPT); FLIPT = setTimeout(flip, 40000);
+      try { flipNow(); } catch (e) { if (window.console) console.log('flip error', e); }
+    }
+    setInterval(function () { if (Date.now() - (window.LASTFLIP || 0) > 120000) flip(); }, 15000);   // watchdog
+    function flipNow() {   // picks 30 s -> season 20 s -> primetime 20 s (first flip after setup: drawPicks needs the cash queue)
+      window.LASTFLIP = Date.now();
+      pane = FIXED || ORDER[(ORDER.indexOf(pane) + 1) % ORDER.length];
+      document.body.className = 'v-rotate pane-' + pane + (/[?&]bets=1/.test(location.search) ? ' bets' : '');
+      if (pane === 'season' && SEASON) drawSeason(SEASON); else if (pane === 'prime' && SEASON) drawPrime(SEASON); else if (pane === 'picks' && PICKS.who) drawPicks(PICKS);
+      else if (pane === 'odds') drawOdds(ODDS); else if (pane === 'news') drawNews(NEWS);
+      clearInterval(OTIMER); clearInterval(ITIMER);
+      if (pane === 'insights') { IPAGE = 0; drawInsights(INS); ITIMER = setInterval(function () { IPAGE++; drawInsights(INS); }, 12000); }
+      if (pane === 'odds') {   // page through the week's games, 6 at a time, 8 s a page
+        OPAGE = 0; drawOdds(ODDS);
+        OTIMER = setInterval(function () { OPAGE++; drawOdds(ODDS); }, 8000);
+      }
+      var opages = Math.max(1, Math.ceil(ODDS.length / OPER));
+      var ipages = INS && INS.cards ? Math.max(1, INS.cards.length) : 2;
+      if (pane === 'records' && SEASON) drawRecords(SEASON);
+      if (FIXED) { clearTimeout(FLIPT); if (pane !== 'odds' && pane !== 'insights') return; }
+      clearTimeout(FLIPT); FLIPT = setTimeout(flip, pane === 'picks' ? 30000 : pane === 'odds' ? opages * 8000 : pane === 'insights' ? (INS && INS.focus ? 36000 : ipages * 12000) : 20000);
+    }
+    setTimeout(flip, 0);
+  }
+
+  // the big-cash wall scrolls too when there are more than fit
+  var hy = 0, hdir = 1, hpause = 0;
+  setInterval(function () {
+    var box = document.querySelector('.hits-box'), list = document.getElementById('s-hits'); if (!box || !document.body.classList.contains('pane-prime')) return;
+    var max = list.scrollHeight - box.clientHeight; if (max <= 0) { list.style.transform = ''; return; }
+    if (hpause > 0) { hpause--; return; }
+    hy += hdir * 0.8; if (hy >= max) { hy = max; hdir = -1; hpause = 90; } if (hy <= 0) { hy = 0; hdir = 1; hpause = 90; }
+    list.style.transform = 'translateY(' + (-hy) + 'px)';
+  }, 33);
+
+  // slow auto-scroll of the bets list when it is taller than its box (reads from across the room)
+  var sy = 0, dir = 1, pause = 0;
+  function scrollSetup() { sy = 0; dir = 1; pause = 120; }
+  setInterval(function () {
+    var box = document.querySelector('.tix-box'), list = document.getElementById('tix');
+    var max = list.scrollHeight - box.clientHeight; if (max <= 0) { list.style.transform = ''; return; }
+    if (pause > 0) { pause--; return; }
+    sy += dir * 0.6; if (sy >= max) { sy = max; dir = -1; pause = 150; } if (sy <= 0) { sy = 0; dir = 1; pause = 150; }
+    list.style.transform = 'translateY(' + (-sy) + 'px)';
+  }, 33);
+
+  // full screen: Silk only allows it from a key press, so the first remote press (or adb keyevent) enters it
+  function goFull() { var d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen; if (f && !document.fullscreenElement && !document.webkitFullscreenElement) try { f.call(d); } catch (e) {} }
+  document.addEventListener('keydown', goFull); document.addEventListener('click', goFull);
+
+
+  // ---- cash celebration: fires when a ticket turns CASHED (never for ones already cashed when the page loaded)
+  var KNOWN = null, QUEUE = [], PLAYING = false;
+  function loadSeen() { try { return JSON.parse(localStorage.getItem('htp_cashed') || 'null'); } catch (e) { return null; } }
+  function saveSeen(o) { try { localStorage.setItem('htp_cashed', JSON.stringify(o)); } catch (e) {} }
+  function checkCashes(tickets) {
+    var now = {}; tickets.forEach(function (t) { if (t.status === 'CASHED') now[t.ticket] = 1; });
+    if (KNOWN === null) { KNOWN = loadSeen() || now; }        // first load: remember, don't celebrate
+    tickets.forEach(function (t) { if (t.status === 'CASHED' && !KNOWN[t.ticket]) QUEUE.push(t); });
+    KNOWN = now; saveSeen(now); playNext();
+  }
+  function label(t) {
+    if (t.bet === 'Game Pick') return t.pick + ' ' + (t.legs[0].line === 'ML' ? 'ML' : (t.legs[0].line || ''));
+    if (t.legs.length === 1) return t.pick + ' ' + (t.legs[0].market === 'First TD' ? 'First TD' : t.legs[0].market.indexOf('Anytime') === 0 ? 'Anytime TD' : t.legs[0].market);
+    return t.bet + (t.payout && t.payout.charAt(0) === '+' ? ' ' + t.payout : '');
+  }
+  function playNext() {
+    if (PLAYING || !QUEUE.length) return;
+    PLAYING = true; var t = QUEUE.shift(), box = document.getElementById('cash');
+    document.getElementById('cashbet').textContent = label(t);
+    var sub = document.getElementById('cashsub'); sub.innerHTML = '';
+    var who = t.source.indexOf('Caller') === 0 ? t.source.replace('Caller: ', '') : t.who === 'HTP' ? 'Hold The Phone' : t.who;
+    var tag = el('span', 'tag ' + (t.source.indexOf('Caller') === 0 ? 'Caller' : t.who), t.source.indexOf('Caller') === 0 ? 'Caller' : t.who === 'HTP' ? 'HTP' : t.who);
+    sub.appendChild(tag); sub.appendChild(document.createTextNode(who + (t.payout ? '  ·  ' + t.payout : '')));
+    var clone = box.cloneNode(true); box.parentNode.replaceChild(clone, box); box = clone;   // restart CSS animations
+    box.className = 'on'; burst(box.querySelector('canvas'));
+    setTimeout(function () { box.className = 'on off'; }, 6400);
+    setTimeout(function () { box.className = ''; PLAYING = false; playNext(); }, 7000);
+  }
+  function burst(cv) {   // $ bills + green/gold/white confetti, gravity, ~6 s
+    var W = cv.width = window.innerWidth, H = cv.height = window.innerHeight, g = cv.getContext('2d'), P = [], t0 = Date.now();
+    var cols = ['#18c964', '#7dffb0', '#ffffff', '#f2b705', '#0e9f4f'];
+    for (var i = 0; i < 180; i++) {
+      var a = Math.random() * Math.PI * 2, v = (0.4 + Math.random()) * H * 0.018;
+      P.push({x: W / 2, y: H * 0.45, vx: Math.cos(a) * v * 1.6, vy: Math.sin(a) * v - H * 0.01, r: Math.random() * 6.28, vr: (Math.random() - .5) * .3,
+              s: H * (0.012 + Math.random() * 0.02), c: cols[i % cols.length], bill: i % 4 === 0});
+    }
+    (function frame() {
+      var dt = Date.now() - t0; if (dt > 6500) { g.clearRect(0, 0, W, H); return; }
+      g.clearRect(0, 0, W, H);
+      P.forEach(function (p) {
+        p.vy += H * 0.0006; p.vx *= 0.995; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        g.save(); g.translate(p.x, p.y); g.rotate(p.r); g.globalAlpha = Math.max(0, 1 - dt / 6500);
+        if (p.bill) { g.fillStyle = '#1f8f4e'; g.fillRect(-p.s * 1.6, -p.s * .8, p.s * 3.2, p.s * 1.6); g.fillStyle = '#c9f7d9';
+                      g.font = 'bold ' + Math.round(p.s * 1.3) + 'px Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('$', 0, 0); }
+        else { g.fillStyle = p.c; g.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); }
+        g.restore();
+      });
+      requestAnimationFrame(frame);
+    })();
+  }
+  if (/[?&]test=cash/.test(location.search)) setTimeout(function () {   // preview: replay the latest cashed bet
+    var c = (PICKS.tickets || []).filter(function (t) { return t.status === 'CASHED'; }); if (c.length) { QUEUE.push(c[c.length - 1]); playNext(); }
+  }, 4000);
+
+  // cashes pushed by hand (tvboard/cash.py): play each one once per TV
+  function loadEv() { try { return JSON.parse(localStorage.getItem('htp_cash_ev') || '{}'); } catch (e) { return {}; } }
+  function cashPushed(evs) {
+    var seen = loadEv(), n = 0;
+    (evs || []).forEach(function (e) { if (!seen[e.id]) { seen[e.id] = 1; n++; QUEUE.push(e); } });
+    if (n) { try { localStorage.setItem('htp_cash_ev', JSON.stringify(seen)); } catch (e) {} playNext(); }
+  }
+  function tick() { get('/api/cash', cashPushed); get('/api/picks', drawPicks); get('/api/scores', drawScores); if (view === 'rotate' || view === 'season') get('/api/season', drawSeason); if (view === 'rotate') { get('/api/odds', drawOdds); get('/api/news', drawNews); get('/api/insights', drawInsights); } }
+  clock(); setInterval(clock, 10000); tick(); setInterval(tick, 30000);
+</script>
+</body></html>
