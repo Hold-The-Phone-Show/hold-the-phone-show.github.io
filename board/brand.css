@@ -1,0 +1,51 @@
+/* Hold The Phone brand pass for the studio TVs (index.html = Bobby's board, studio.html = Max's studio calendar).
+   Loaded after each page's own styles, so it only re-skins: layouts, timings and animations stay the pages' own.
+   Colours are the logo's (navy #2a2f72, red #bc2130, lightning gold #f5a71c, sky #cbe6f3); display type is Tungsten,
+   the on-air lower-third font (served from fonts/ on the Mac; the public website falls back to Anton). */
+@import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
+@font-face { font-family: 'Tungsten'; src: url('fonts/tungsten-bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Tungsten'; src: url('fonts/tungsten-semi-bold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+
+:root { --navy:#2a2f72; --red:#bc2130; --gold:#f5a71c; --sky:#cbe6f3; --bg:#060924; --panel:#0f1640; --line:#283580; --muted:#a3add9;
+        --disp:'Tungsten','Anton','Impact','Arial Narrow',sans-serif; }
+
+/* backdrop: navy spotlight from the top, darker edges, a faint diagonal broadcast texture */
+html, body { background:var(--bg); }
+body { background:
+  radial-gradient(ellipse 90% 60% at 50% -10%, rgba(60,72,170,.55), transparent 70%),
+  radial-gradient(ellipse 120% 90% at 50% 120%, rgba(188,33,48,.16), transparent 60%),
+  repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 2px, transparent 2px 9px),
+  linear-gradient(180deg, #0a1033, #060924 60%, #04061a); }
+body::after { content:''; position:fixed; inset:0; pointer-events:none; z-index:1; box-shadow:inset 0 0 22vh rgba(0,0,0,.55); }
+
+/* header: the real badge, navy-to-red broadcast bar with a gold hairline */
+header { position:relative; z-index:2; background:linear-gradient(90deg,#1b2160 0%,#2a2f72 38%,#40205a 72%,#bc2130 100%) !important;
+         box-shadow:0 .6vh 2.4vh rgba(0,0,0,.45); border-bottom:.35vh solid var(--red); }
+header::after { content:''; position:absolute; left:0; right:0; bottom:-.75vh; height:.4vh; background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--gold) 70%,transparent); opacity:.85; }
+header .badge { height:8.4vh; width:8.4vh; margin:-.4vh .2vh -1.6vh 0; filter:drop-shadow(0 .5vh 1vh rgba(0,0,0,.5)); position:relative; z-index:3; }
+header .logo { font-family:var(--disp); font-weight:700; letter-spacing:.2vh; }
+header .logo i { font-style:normal; color:var(--sky); font-size:5.2vh; }
+.hdr-mid { font-family:var(--disp) !important; font-weight:700; font-size:4.4vh !important; letter-spacing:.35vh !important; color:#fff !important; text-shadow:0 .3vh 1vh rgba(0,0,0,.4); }
+.clock { font-family:var(--disp); font-weight:700; font-size:5vh !important; letter-spacing:.2vh; }
+
+/* section labels */
+h2 { font-family:var(--disp); font-weight:600; font-size:3vh !important; letter-spacing:.45vh !important; color:var(--sky) !important; opacity:.9; }
+
+/* panels: glassy navy cards with a top highlight */
+.g, .t, .od, .nw, .lb, .tr, .ty, .gp, .dv, .bn, .now, .ev, .dy, #season .s-more > div, .r-top > div, .r-grid > div {
+  background:linear-gradient(180deg, rgba(36,48,122,.55), rgba(14,20,62,.88)) !important;
+  border-color:rgba(120,140,230,.28) !important; box-shadow:inset 0 .15vh 0 rgba(255,255,255,.07), 0 .8vh 2.4vh rgba(0,0,0,.35); }
+main, .wrap > main { position:relative; z-index:2; }
+
+/* display type on the numbers and names that carry each screen */
+.sc, .big, .p .big, .tm, .od .t, .od .col span, .gp-team b, .gp-rec, .gp-pick-txt, .bn .br, .bn .bl, .bn.hero .tg, .dv h3, .dv .sr .ab, .dv .sr .rc,
+.stamp .word, .cash-bet, .bstamp, .bhead, .bkind, .now .tt, .now .cd, .now .st, .ev .n, .ev .t, .dy h3, .ss b, .lt-tag, .lt-txt, #factbar .fx, #factbar .ft, .rk {
+  font-family:var(--disp) !important; font-weight:700 !important; letter-spacing:.06vh; }
+.tm, .od .t, .gp-team b, .dv .sr .ab, .now .tt, .ev .n { text-transform:uppercase; }
+#factbar .fx { font-size:4.4vh !important; letter-spacing:.1vh; } .lt-txt { font-size:3vh !important; }
+.sc { font-size:6vh !important; } .od .col span { font-size:5vh !important; } .dv .sr .ab, .dv .sr .rc { font-size:4.4vh !important; }
+.now .tt { font-size:7.4vh !important; letter-spacing:.1vh; } .ev .n { font-size:3.6vh !important; } .bhead { font-size:8.2vh !important; } .bstamp { font-size:19vh !important; }
+
+/* the lower-third bar matches the on-air one: red tag, white plate, gold underline */
+#factbar { box-shadow:0 1vh 3vh rgba(0,0,0,.6), 0 .4vh 0 var(--gold) !important; }
+#factbar .ft { background:linear-gradient(180deg,#d0283a,#9e1726) !important; }
