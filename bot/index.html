@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0}</style>
+<title>HTP Bot</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: left rail (Chat / Prop Explorer / Lines) beside one working pane; stacks to a top tab bar on phones.
+     A single dark broadcast look on purpose: Hold The Phone navy + red, like the show's on-air graphics. */
+  :root {
+    --bg: #070a1c; --rail: #0a0f2a; --panel: #10163a; --panel-2: #151d4a; --line: #26307a;
+    --fg: #f4f6ff; --muted: #9aa3d6; --red: #ce0e29; --navy: #1c2c7c; --ok: #18c964; --bad: #ff4d5e; --gold: #f2b705;
+    --display: "Anton", "Impact", "Arial Narrow", sans-serif; --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; }
+  .app { display: grid; grid-template-columns: 220px minmax(0, 1fr); height: 100%; }
+  nav { background: var(--rail); border-right: 1px solid var(--line); padding: 18px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .brand { font-family: var(--display); font-size: 26px; line-height: .95; text-transform: uppercase; margin: 0 6px 16px; letter-spacing: .5px; }
+  .brand b { background: #fff; color: var(--red); padding: 0 5px; border-radius: 3px; font-weight: 400; }
+  .brand small { display: block; font-family: var(--body); font-size: 11px; letter-spacing: 2px; color: var(--muted); margin-top: 8px; }
+  nav button { font: 700 15px var(--body); text-align: left; background: none; border: 0; color: var(--muted); padding: 10px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+  nav button[aria-pressed="true"] { background: var(--panel-2); color: var(--fg); box-shadow: inset 3px 0 0 var(--red); }
+  nav button:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .foot { margin-top: auto; font-size: 11px; color: var(--muted); line-height: 1.6; padding: 0 6px; }
+  main { overflow: auto; min-width: 0; }
+  .pane { padding-block: 26px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 1080px; margin: 0 auto; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: clamp(30px, 4.4vw, 46px); letter-spacing: .5px; margin: 0 0 4px; text-transform: uppercase; text-wrap: balance; }
+  h1 em { color: var(--red); font-style: normal; }
+  .sub { color: var(--muted); margin: 0 0 20px; max-width: 62ch; }
+  .stamp { display: inline-block; font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; margin-bottom: 16px; }
+  @media (max-width: 760px) {
+    .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+    nav { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 10px max(16px, env(safe-area-inset-left, 0px)); }
+    .brand, .foot { display: none; }
+  }
+  /* chat */
+  #chat { display: flex; flex-direction: column; min-height: 100%; }
+  .msgs { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .m { max-width: min(760px, 94%); padding: 12px 16px; border-radius: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+  .m.u { align-self: flex-end; background: var(--navy); }
+  .m.a { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); }
+  .m.a p { margin: .35em 0; } .m.a ul { margin: .3em 0; padding-left: 20px; } .m.a strong { color: #fff; }
+  .m .tools { font-size: 11px; color: var(--muted); margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .m .tools span { background: #1d2560; border-radius: 4px; padding: 1px 6px; }
+  .sugg { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .sugg button { font: 15px var(--body); text-align: left; background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 12px; padding: 14px; cursor: pointer; }
+  .sugg button b { display: block; font-size: 11px; letter-spacing: 1.6px; color: var(--red); margin-bottom: 6px; }
+  .sugg button:hover { border-color: #4a5bd6; }
+  form.ask { position: sticky; bottom: 0; display: flex; gap: 8px; padding-block: 14px 18px; background: var(--bg); }
+  form.ask input { flex: 1; min-width: 0; font: 16px var(--body); padding: 13px 15px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); }
+  .btn { font: 700 15px var(--body); background: var(--red); color: #fff; border: 0; border-radius: 12px; padding: 0 18px; cursor: pointer; }
+  .btn.ghost { background: var(--panel-2); color: var(--fg); }
+  .notice { color: var(--muted); font-size: 13px; }
+  /* explorer */
+  .search { display: flex; gap: 8px; margin-bottom: 18px; position: relative; }
+  .search input { flex: 1; min-width: 0; font: 16px var(--body); padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); }
+  .ph { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .ph h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 32px; letter-spacing: .5px; text-transform: uppercase; }
+  .ph span { color: var(--muted); font-weight: 700; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .chips button { font: 700 13px var(--body); background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 99px; padding: 7px 12px; cursor: pointer; }
+  .chips button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+  .chips button small { color: var(--muted); margin-left: 6px; } .chips button[aria-pressed="true"] small { color: #4a5070; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; min-width: 0; }
+  .lab { color: var(--muted); font-weight: 700; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; }
+  .hr { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin: 4px 0 8px; }
+  .hr .big { font-family: var(--display); font-size: 54px; line-height: 1; }
+  .good { color: var(--ok); } .meh { color: var(--gold); } .bad { color: var(--bad); }
+  svg text { fill: #cfd4f5; font-size: 11px; font-family: var(--body); }
+  .tablewrap { overflow-x: auto; }
+  table.gl { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  table.gl th, table.gl td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  table.gl th:first-child, table.gl td:first-child { text-align: left; } table.gl th { color: var(--muted); font-weight: 600; }
+  .list { position: absolute; top: 100%; left: 0; right: 90px; z-index: 5; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; margin-top: 4px; max-height: 280px; overflow: auto; }
+  .list button { display: block; width: 100%; text-align: left; font: 14px var(--body); color: var(--fg); background: none; border: 0; padding: 9px 12px; cursor: pointer; }
+  .list button:hover, .list button:focus-visible { background: var(--navy); }
+  .list button small { color: var(--muted); margin-left: 8px; }
+  /* pick support */
+  .sgames { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 8px; margin-bottom: 18px; }
+  .sgames button { font: 700 14px var(--body); background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; padding: 10px 12px; cursor: pointer; text-align: left; }
+  .sgames button small { display: block; color: var(--muted); font-weight: 600; font-size: 12px; margin-top: 2px; }
+  .sgames button[aria-pressed="true"] { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
+  .sides { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+  @media (max-width: 600px) { .sides { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .sides button { font: 400 22px var(--display); letter-spacing: .5px; text-transform: uppercase; background: var(--panel-2); border: 2px solid var(--line); color: var(--fg); border-radius: 12px; padding: 12px 8px; cursor: pointer; }
+  .sides button small { display: block; font: 700 12px var(--body); color: var(--muted); letter-spacing: 0; text-transform: none; margin-top: 2px; }
+  .sides button[aria-pressed="true"] { background: var(--ok); border-color: var(--ok); color: #04220f; } .sides button[aria-pressed="true"] small { color: #0c3a22; }
+  .facts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .lt { display: flex; align-items: stretch; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.45); }
+  .lt-tag { background: var(--red); color: #fff; font: 400 15px var(--display); letter-spacing: 1px; padding: 0 12px; display: flex; align-items: center; justify-content: center; min-width: 140px; text-align: center; text-transform: uppercase; }
+  .lt-txt { flex: 1; min-width: 0; background: linear-gradient(90deg, #f4f6ff, #dfe4ff); color: #0b1240; font: 400 clamp(17px, 2.2vw, 24px) var(--display); letter-spacing: .4px; padding: 10px 14px; text-transform: uppercase; line-height: 1.15; }
+  @media (max-width: 600px) { .lt { flex-direction: column; } .lt-tag { min-width: 0; padding: 4px 10px; justify-content: flex-start; } }
+  .copyrow { display: flex; gap: 8px; align-items: center; } .copyrow .btn { padding: 10px 16px; }
+  /* nba due */
+  .due { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; margin-bottom: 24px; }
+  .dc { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+  .dc:hover { border-color: #4a5bd6; } .dc img { width: 58px; height: 44px; object-fit: cover; object-position: top; border-radius: 8px; background: var(--panel-2); }
+  .dc .rk { font-size: 11px; font-weight: 800; color: var(--gold); letter-spacing: 1px; } .dc .nm { font-weight: 800; font-size: 17px; } .dc .nm small { color: var(--muted); font-weight: 700; font-size: 12px; margin-left: 6px; }
+  .dc .pr { text-align: right; } .dc .pr b { display: block; font: 400 20px var(--display); letter-spacing: .5px; } .dc .pr span { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .dc .why { grid-column: 1 / -1; font-size: 13px; color: #dfe4ff; line-height: 1.45; margin-top: 6px; } .dc .why b { color: var(--ok); } .dc .why i { color: var(--bad); font-style: normal; font-weight: 700; }
+  .dc .inj { color: var(--gold); font-weight: 800; font-size: 11px; }
+  .l5 { grid-column: 1 / -1; display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .l5 span { font-size: 12px; font-weight: 800; padding: 4px 8px; border-radius: 6px; background: #3a1220; color: #ffb3bd; font-variant-numeric: tabular-nums; }
+  .l5 span.hit { background: #0c3a22; color: #9ff0c2; } .l5 span small { font-weight: 700; opacity: .75; margin-left: 4px; }
+  .duelab { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 3px 8px; border-radius: 6px; background: var(--ok); color: #04220f; margin-left: 8px; }
+  table.miss td.v { color: var(--bad); font-weight: 800; } table.miss td.v.hit { color: var(--ok); }
+  .notice a { color: var(--fg); }
+  /* lines */
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+  .g { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) 62px 74px 62px; gap: 6px 8px; align-items: center; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+  .g:hover { border-color: #4a5bd6; }
+  .g .t { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 16px; min-width: 0; }
+  .g .t span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .g .ab { font-family: var(--display); font-size: 15px; width: 34px; text-align: center; color: var(--muted); letter-spacing: .5px; }
+  .g .v { background: #1d2560; border-radius: 6px; text-align: center; padding: 5px 0; font-weight: 800; font-variant-numeric: tabular-nums; font-size: 14px; }
+  .g .h { font-size: 10px; color: var(--muted); text-align: center; letter-spacing: 1px; }
+  .g .ko { grid-column: 1 / -1; font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: .5px; }
+  .empty { color: var(--muted); padding: 18px 0; }
+  @media (prefers-reduced-motion: no-preference) { .m { animation: rise .25s ease-out both; } @keyframes rise { from { opacity: .4; transform: translateY(4px); } } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;600;700;800&display=swap">
+
+<div class="app">
+  <nav aria-label="Sections">
+    <div class="brand">Hold <b>The</b> Phone<small>HTP BOT · BETMGM</small></div>
+    <button data-p="chat" aria-pressed="true">Chat</button>
+    <button data-p="support" aria-pressed="false">Pick Support</button>
+    <button data-p="explore" aria-pressed="false">Prop Explorer</button>
+    <button data-p="games" aria-pressed="false">This Week's Lines</button>
+    <button data-p="nba" aria-pressed="false">NBA Due</button>
+    <div class="foot">Odds: BetMGM only.<br>Trends: last-10 game logs.<br><span id="upd"></span><br>21+. Gamble responsibly.<br>1-800-GAMBLER</div>
+  </nav>
+  <main>
+    <section id="chat" class="pane">
+      <div class="msgs" id="msgs">
+        <div id="hello">
+          <h1>What's the <em>play</em>?</h1>
+          <p class="sub">Ask about props, parlays, matchups or how Hold The Phone has done. HTP Bot reads this week's BetMGM lines, every player's last 10 games and our whole season of picks.</p>
+          <div class="sugg" id="sugg"></div>
+          <p class="notice" id="cnote">The chat runs on your own Claude account. Claude will ask once before it answers.</p>
+        </div>
+      </div>
+      <form class="ask" id="ask"><input id="q" placeholder="Is Puka over his receiving yards a good bet this week?" autocomplete="off" aria-label="Ask HTP Bot"><button class="btn" id="send">Ask</button><button class="btn ghost" id="stop" type="button" hidden>Stop</button></form>
+    </section>
+    <section id="support" class="pane" hidden>
+      <h1>Pick <em>Support</em></h1>
+      <p class="sub">Pick a game, tap your side, and get up to 20 facts behind it, ready to read on air: Hold The Phone's own record on picks like it, team trends, the matchup and player trends. Every fact is computed from this season's results, last-10 game logs, BetMGM's lines and our picks.</p>
+      <div class="sgames" id="sgames"></div>
+      <div id="sout"></div>
+    </section>
+    <section id="explore" class="pane" hidden>
+      <h1>Prop <em>Explorer</em></h1>
+      <p class="sub">Every BetMGM prop for a player, against his last 10 games.</p>
+      <div class="search"><input id="xp" placeholder="Player, e.g. Trey McBride" autocomplete="off" aria-label="Player name"><button class="btn" id="xgo">Look up</button><div class="list" id="xlist" hidden></div></div>
+      <div id="xout"></div>
+    </section>
+    <section id="games" class="pane" hidden>
+      <h1>This week's <em>lines</em></h1>
+      <p class="sub">BetMGM spread, total and moneyline for every upcoming game. Tap a game to have HTP Bot break it down.</p>
+      <div class="games" id="glist"><div class="empty">Loading BetMGM lines…</div></div>
+    </section>
+    <section id="nba" class="pane" hidden>
+      <h1>NBA <em>Due</em></h1>
+      <p class="sub">We don't chase hot players. These are the ones who normally clear tonight's BetMGM line, are cold on it lately, and are still playing their minutes.</p>
+      <div class="search"><input id="np" placeholder="Search any player with a BetMGM prop, e.g. Cade Cunningham" autocomplete="off" aria-label="NBA player"><button class="btn" id="ngo">Look up</button><div class="list" id="nlist" hidden></div></div>
+      <div id="nout"></div>
+      <h2 class="lab" style="margin:8px 0 12px">Top 15 most due</h2>
+      <div class="due" id="ntop"><div class="empty">Loading the NBA board…</div></div>
+      <p class="notice" id="nfoot"></p>
+    </section>
+  </main>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const el = (t, c, txt) => { const e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; };
+const DATA = {};
+const load = (n) => fetch('data/' + n + '.json').then((r) => r.json());
+const ready = Promise.all(['games', 'props', 'logs', 'picks', 'meta', 'teams', 'support', 'nba'].map((n) => load(n).then((v) => { DATA[n] = v; }).catch(() => { DATA[n] = n === 'picks' ? [] : {}; })))
+  .then(() => { $('#upd').textContent = DATA.meta.updated_label ? 'Data: ' + DATA.meta.updated_label : ''; });
+
+document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('nav button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  document.querySelectorAll('section.pane').forEach((s) => { s.hidden = s.id !== b.dataset.p; });
+  if (b.dataset.p === 'games') drawGames();
+  if (b.dataset.p === 'nba') drawNBA();
+}));
+
+// ---------- lookups (shared by the chat tools and the explorer) ----------
+const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, '').replace(/\s+(jr|sr|ii|iii|iv)$/, '').trim();
+function findPlayer(q) {
+  const n = norm(q); if (!n) return null;
+  const names = [...new Set([...Object.keys(DATA.props || {}), ...Object.keys(DATA.logs || {})])];
+  return names.find((k) => norm(k) === n) || names.find((k) => norm(k).includes(n)) || names.find((k) => n.split(' ').every((w) => norm(k).includes(w))) || null;
+}
+const STAT = {
+  receiving_yards: ['receivingYards'], receptions: ['receptions'], targets: ['receivingTargets'], rushing_yards: ['rushingYards'],
+  rush_attempts: ['rushingAttempts'], passing_yards: ['passingYards'], passing_tds: ['passingTouchdowns'], completions: ['completions'],
+  pass_attempts: ['passingAttempts'], interceptions: ['interceptions'], rush_rec_yards: ['rushingYards', 'receivingYards'],
+  pass_rush_yards: ['passingYards', 'rushingYards'], anytime_td: ['rushingTouchdowns', 'receivingTouchdowns'], rec_tds: ['receivingTouchdowns'], rush_tds: ['rushingTouchdowns'],
+};
+function hitRate(player, stat, line, n = 10, over = true) {
+  const p = findPlayer(player), L = p && DATA.logs[p];
+  if (!L) throw new Error(`No game log for "${player}"`);
+  const keys = STAT[stat]; if (!keys) throw new Error('stat must be one of ' + Object.keys(STAT).join(', '));
+  const games = L.games.slice(0, n).map((g) => { let v = keys.reduce((s, k) => s + (g.s[k] || 0), 0); if (stat === 'anytime_td') v = v > 0 ? 1 : 0; return { date: g.d, opp: (g.at === '@' ? '@' : 'vs ') + g.opp, value: v }; });
+  const hits = games.filter((g) => (over ? g.value > line : g.value < line)).length;
+  const avg = games.length ? games.reduce((s, g) => s + g.value, 0) / games.length : 0;
+  return { player: p, stat, line, side: over ? 'over' : 'under', hits, of: games.length, hit_rate_pct: games.length ? Math.round((100 * hits) / games.length) : null, average: Math.round(avg * 10) / 10, games };
+}
+function propsFor(player) {
+  const p = findPlayer(player), P = p && DATA.props[p];
+  if (!P) throw new Error(`BetMGM has no open props for "${player}" right now`);
+  return { player: p, team: P.team || '', game: P.game, kickoff: P.kickoff, markets: P.markets.map((m) => ({ market: m.market, options: m.options.filter((o) => o.price) })) };
+}
+function picksSearch({ search = '', show_type = '', bet_type = '', who = '' } = {}) {
+  const s = norm(search);
+  const m = (DATA.picks || []).filter((r) => (!s || norm(`${r.pick} ${r.game} ${r.market} ${r.title}`).includes(s)) && (!show_type || String(r.type).toUpperCase() === String(show_type).toUpperCase())
+    && (!bet_type || String(r.bet).toLowerCase().includes(String(bet_type).toLowerCase())) && (!who || String(r.who).toLowerCase() === String(who).toLowerCase()));
+  const c = (x) => m.filter((r) => r.result === x).length;
+  return { legs_matched: m.length, legs_record: `${c('Win')}-${c('Loss')}-${c('Push')}`, pending: c('Pending'),
+           legs: m.slice(0, 40).map((r) => ({ date: r.date, show: r.type_label, bet: r.bet, pick: r.pick, game: r.game, market: r.market, line: r.line, odds: r.odds, result: r.result, who: r.who })) };
+}
+
+function teamAbbr(q) {
+  const n = norm(q), T = DATA.teams || {};
+  if (T[String(q).toUpperCase()]) return String(q).toUpperCase();
+  for (const g of DATA.games || []) { if (norm(g.away).includes(n) || norm(g.away).split(' ').pop() === n) return g.away_abbr; if (norm(g.home).includes(n) || norm(g.home).split(' ').pop() === n) return g.home_abbr; }
+  return null;
+}
+function teamTrends(team, spread = null, total = null) {
+  const a = teamAbbr(team), G = a && (DATA.teams || {})[a];
+  if (!G) throw new Error(`No results found for "${team}"`);
+  if (!G.length) return { team: a, games: 0 };
+  const rec = (H) => `${H.filter((g) => g.pf > g.pa).length}-${H.filter((g) => g.pf < g.pa).length}`, avg = (f) => Math.round((10 * G.reduce((s, g) => s + f(g), 0)) / G.length) / 10;
+  const out = { team: a, games: G.length, record: rec(G), home: rec(G.filter((g) => g.home)), road: rec(G.filter((g) => !g.home)),
+    points_for: avg((g) => g.pf), points_against: avg((g) => g.pa), avg_margin: avg((g) => g.pf - g.pa), avg_game_total: avg((g) => g.pf + g.pa),
+    last5: G.slice(-5).map((g) => `${g.home ? 'vs' : '@'} ${g.opp} ${g.pf > g.pa ? 'W' : g.pf < g.pa ? 'L' : 'T'} ${g.pf}-${g.pa}`) };
+  if (spread != null && !isNaN(spread)) { const c = G.map((g) => g.pf + spread - g.pa); out.vs_this_spread = { line: spread, would_have_covered: c.filter((x) => x > 0).length, pushed: c.filter((x) => x === 0).length, of: G.length }; }
+  if (total != null && !isNaN(total)) { const t = G.map((g) => g.pf + g.pa); out.vs_this_total = { line: total, over: t.filter((x) => x > total).length, under: t.filter((x) => x < total).length, of: G.length }; }
+  return out;
+}
+function matchupTrends(team) {
+  const a = teamAbbr(team), g = (DATA.games || []).find((x) => x.away_abbr === a || x.home_abbr === a);
+  if (!g) throw new Error(`No BetMGM game this week for "${team}"`);
+  const sp = g.spread, tot = g.total == null ? null : Number(g.total);
+  return { game: g.game, kickoff: g.kickoff, spread: sp, spread_prices: g.spread_prices, total: g.total, total_prices: g.total_prices, moneyline: g.moneyline,
+    away: teamTrends(g.away_abbr, sp ? Number(String(sp[0]).replace('PK', '0')) : null, tot), home: teamTrends(g.home_abbr, sp ? Number(String(sp[1]).replace('PK', '0')) : null, tot),
+    note: 'would_have_covered applies this week\'s BetMGM line to each past final score; it is not a historical against-the-spread record.' };
+}
+
+// ---------- chat ----------
+const RULES = `You are HTP Bot, the betting research assistant for Hold The Phone (presented by BetMGM). Today's data snapshot: ${''}{UPDATED}.
+Rules:
+- Odds and lines come ONLY from the get_games and get_player_props tools (BetMGM, the show's sponsor). Never quote or mention any other sportsbook. If BetMGM has no market for something, say so.
+- Back every take with numbers from the tools: last-10 hit rate and average against the actual BetMGM line and price. Mention the game-by-game values when they tell the story.
+- When someone tells you their pick (or asks you to support a pick), call pick_support and lead with those facts, each on its own line as "TAG: fact".
+- For game picks and matchups, call matchup_trends: quote the BetMGM spread or total WITH its price (juice), each team's record, scoring and margin, and how often each would have covered this BetMGM line / gone over this BetMGM total. Say it is this week's line applied to past results, not a historical ATS record.
+- For how Hold The Phone has done, use htp_picks. Game picks are bet "Game Pick"; first TD bets are "First TD Scorer".
+- Be direct and fun like the show, but tight: lead with the pick or answer, then the 2-4 numbers that support it. Short paragraphs or a short bullet list.
+- Never call anything a lock or a guarantee. For a parlay, give each leg's BetMGM price and its hit-rate support.`;
+const TOOLS = [
+  { name: 'get_games', description: "This week's NFL games with BetMGM main spread, total and moneyline and kickoff times. Returns a list.",
+    execute: () => (DATA.games || []).map((g) => ({ game: g.game, kickoff: g.kickoff, spread: g.spread, spread_prices: g.spread_prices, total: g.total, total_prices: g.total_prices, moneyline: g.moneyline })) },
+  { name: 'matchup_trends', description: "Betting trends for this week's game involving a team: both teams' season record, home/road, points for/against, average margin, last 5, and how often each would have covered this week's BetMGM spread and how often their games went over this week's BetMGM total (with the BetMGM prices).",
+    inputSchema: { type: 'object', properties: { team: { type: 'string' } }, required: ['team'] }, execute: (i) => matchupTrends(String(i.team)) },
+  { name: 'team_trends', description: 'Season trends for one team (record, home/road, scoring, margin, last 5). Optionally pass spread (from that team\'s side, e.g. -3) and/or total to see how often its results would have covered / gone over.',
+    inputSchema: { type: 'object', properties: { team: { type: 'string' }, spread: { type: 'number' }, total: { type: 'number' } }, required: ['team'] },
+    execute: (i) => teamTrends(String(i.team), i.spread == null ? null : Number(i.spread), i.total == null ? null : Number(i.total)) },
+  { name: 'get_player_props', description: 'All open BetMGM markets for one player this week: over/under lines, milestone ladders (e.g. "to record 75+ receiving yards"), anytime / 2+ / first TD prices.',
+    inputSchema: { type: 'object', properties: { player: { type: 'string' } }, required: ['player'] }, execute: (i) => propsFor(String(i.player)) },
+  { name: 'hit_rate', description: `How often a player cleared (or stayed under) a line in his last N games (default 10), with each game's value and the average. stat is one of: ${Object.keys(STAT).join(', ')}. Anytime TD: stat=anytime_td, line=0.5. A "75+" milestone is line=74.5.`,
+    inputSchema: { type: 'object', properties: { player: { type: 'string' }, stat: { type: 'string', enum: Object.keys(STAT) }, line: { type: 'number' }, n: { type: 'integer' }, over: { type: 'boolean' } }, required: ['player', 'stat', 'line'] },
+    execute: (i) => hitRate(String(i.player), String(i.stat), Number(i.line), i.n ? Number(i.n) : 10, i.over !== false) },
+  { name: 'players_in_game', description: 'Every player with BetMGM props in one game (search by a team name), with his markets count. Use it to find candidates for an SGP or a game breakdown.',
+    inputSchema: { type: 'object', properties: { team: { type: 'string' } }, required: ['team'] },
+    execute: (i) => { const t = norm(i.team); return Object.entries(DATA.props || {}).filter(([, v]) => norm(v.game).includes(t)).map(([k, v]) => ({ player: k, team: v.team || '', markets: v.markets.length })).slice(0, 60); } },
+  { name: 'htp_picks', description: "Search Hold The Phone's own picks this season and get the legs record. Optional filters: search (player/team text), show_type (SUNDAY, LIVE, MNF, TNF, CFB, EWL), bet_type (Game Pick, First TD Scorer, Parlay, ...), who (HTP, Gavin, Danny, Loops, Team).",
+    inputSchema: { type: 'object', properties: { search: { type: 'string' }, show_type: { type: 'string' }, bet_type: { type: 'string' }, who: { type: 'string' } } }, execute: (i) => picksSearch(i || {}) },
+];
+const SUGG = [['PARLAY', 'Build a 4-leg same game parlay for Thursday night with BetMGM prices'], ['PROP', 'Best receiving yards overs on the board this week, backed by last-10 hit rates'],
+              ['TD', 'Best anytime TD values this Sunday'], ['RECORD', 'How has Hold The Phone done on first TD scorer bets this season?']];
+SUGG.forEach(([k, q]) => { const b = el('button'); b.type = 'button'; b.append(el('b', null, k), document.createTextNode(q)); b.addEventListener('click', () => ask(q)); $('#sugg').append(b); });
+
+function md(text) {   // escape, then **bold**, bullet lists and paragraphs
+  const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return esc.split(/\n{2,}/).map((blk) => {
+    const lines = blk.split('\n').filter((l) => l.trim());
+    if (lines.length && lines.every((l) => /^\s*([-*•]|\d+\.)\s/.test(l))) return '<ul>' + lines.map((l) => '<li>' + l.replace(/^\s*([-*•]|\d+\.)\s/, '') + '</li>').join('') + '</ul>';
+    return '<p>' + lines.join('<br>') + '</p>';
+  }).join('').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/^#+\s*/gm, '');
+}
+const turns = []; let sample = null, ctl = null, busy = false;
+(async () => { sample = window.claude ? await claude.use('sample') : null; if (!sample) $('#cnote').innerHTML = 'Chat runs inside Claude: <a href="https://claude.ai/artifact/CcqWWmxnXYULWRunowMeXa" target="_blank" rel="noopener">open HTP Bot in Claude</a> to ask it anything. Pick Support, Prop Explorer, Lines and NBA Due work right here.'; })();
+const CODE = { not_granted: 'Chat needs your OK to use your Claude account. Reload the page to be asked again.', rate_limited: 'Claude is busy or your usage limit was reached. Try again in a bit.',
+  session_expired: 'Sign in to Claude again, then ask.', sampling_disabled: 'Claude chat is not available on this account.', tools_unavailable: 'This Claude app cannot run the lookups. Try claude.ai in a browser.', refused: 'Claude would not answer that one. Try rephrasing.' };
+async function ask(q) {
+  q = q.trim(); if (!q || busy) return;
+  if (!sample) { $('#cnote').innerHTML = 'Chat runs inside Claude: <a href="https://claude.ai/artifact/CcqWWmxnXYULWRunowMeXa" target="_blank" rel="noopener">open HTP Bot in Claude</a>.'; return; }
+  await ready; $('#q').value = ''; const hello = $('#hello'); if (hello) hello.remove();
+  const box = $('#msgs'); box.append(el('div', 'm u', q)); turns.push({ role: 'user', content: q });
+  const bubble = el('div', 'm a', 'Thinking…'), used = el('div', 'tools'); box.append(bubble); bubble.scrollIntoView({ block: 'end' });
+  busy = true; $('#stop').hidden = false; $('#send').disabled = true; ctl = new AbortController();
+  const tools = TOOLS.map((t) => ({ ...t, execute: (i) => { const s = el('span', null, t.name.replace(/_/g, ' ') + (i && i.player ? ' · ' + i.player : i && i.team ? ' · ' + i.team : '')); used.append(s); if (!used.parentNode) bubble.append(used); return t.execute(i || {}); } }));
+  try {
+    const input = [{ role: 'user', content: RULES.replace('{UPDATED}', (DATA.meta && DATA.meta.updated_label) || 'unknown') }, ...turns.slice(-12)];
+    const r = await sample(input, { tools, signal: ctl.signal, onText: ({ text }) => { bubble.innerHTML = md(text); if (used.childNodes.length) bubble.append(used); } });
+    bubble.innerHTML = md(r.text); if (used.childNodes.length) bubble.append(used);
+    turns.push({ role: 'assistant', content: r.text });
+  } catch (e) {
+    if (e && e.text) { bubble.innerHTML = md(e.text); turns.push({ role: 'assistant', content: e.text }); } else if (!e || e.code !== 'cancelled') bubble.textContent = '';
+    if (e && e.code !== 'cancelled') bubble.append(el('p', 'notice', CODE[e.code] || 'Something went wrong reaching Claude. Ask again.'));
+    if (e && e.code === 'cancelled' && !e.text) bubble.textContent = 'Stopped.';
+  } finally { busy = false; $('#stop').hidden = true; $('#send').disabled = false; }
+}
+$('#ask').addEventListener('submit', (e) => { e.preventDefault(); ask($('#q').value); });
+$('#stop').addEventListener('click', () => ctl && ctl.abort());
+
+// ---------- prop explorer ----------
+const MKT = [[/Rushing and Receiving Yards|Rush \+ Rec/i, ['rushingYards', 'receivingYards']], [/Reception Yards|Receiving Yards|receiving yards/i, ['receivingYards']],
+  [/^Receptions|receptions/i, ['receptions']], [/Rushing Yards|rushing yards/i, ['rushingYards']], [/Passing Yards|passing yards/i, ['passingYards']],
+  [/Passing Touchdowns|Touchdown Passes|passing TD/i, ['passingTouchdowns']], [/to score 1\+ TDs/i, ['rushingTouchdowns', 'receivingTouchdowns']]];
+function marketLines(P) {
+  const out = [];
+  P.markets.forEach((m) => {
+    const map = MKT.find(([re]) => re.test(m.market)); if (!map) return;
+    const ov = m.options.find((o) => /^Over/i.test(o.option)); let line = null, price = null;
+    if (ov) { line = parseFloat(ov.option.replace(/[^\d.]/g, '')); price = ov.price; }
+    else { const mm = m.market.match(/(\d+)\+/); const yes = m.options.find((o) => o.option === 'Yes') || m.options[0]; if (/1\+ TDs/.test(m.market)) { line = 0.5; price = yes.price; } else if (mm) { line = parseFloat(mm[1]) - 0.5; price = yes.price; } }
+    if (line != null && !isNaN(line)) out.push({ label: m.market, keys: map[1], line, price, td: /TDs/.test(m.market) });
+  });
+  return out;
+}
+function chart(games, m) {
+  const W = 760, H = 230, pad = 34, g = games.slice().reverse();
+  const vals = g.map((x) => m.keys.reduce((s, k) => s + (x.s[k] || 0), 0));
+  const max = Math.max(m.line * 1.4, ...vals, 1), bw = (W - pad * 2) / Math.max(g.length, 1), y = (v) => H - pad - (v / max) * (H - pad * 2.2);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Last ${g.length} games against the line">`;
+  g.forEach((x, i) => { const v = vals[i], hit = v > m.line, cx = pad + i * bw + bw / 2;
+    s += `<rect x="${pad + i * bw + 6}" y="${y(v)}" width="${Math.max(4, bw - 12)}" height="${Math.max(2, H - pad - y(v))}" rx="4" fill="${hit ? '#18c964' : '#ff4d5e'}"></rect>`;
+    s += `<text x="${cx}" y="${y(v) - 6}" text-anchor="middle">${m.td ? (v > 0 ? v + ' TD' : '0') : v}</text><text x="${cx}" y="${H - 12}" text-anchor="middle">${x.at === '@' ? '@' : ''}${x.opp}</text>`; });
+  s += `<line x1="${pad}" x2="${W - pad}" y1="${y(m.line)}" y2="${y(m.line)}" stroke="#ffffff" stroke-dasharray="6 5" stroke-width="2"></line><text x="${W - pad}" y="${y(m.line) - 6}" text-anchor="end">line ${m.line}</text></svg>`;
+  const hits = vals.filter((v) => v > m.line).length;
+  return { svg: s, hits, n: vals.length, avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0 };
+}
+async function explore(q) {
+  await ready; $('#xlist').hidden = true;
+  const out = $('#xout'); out.innerHTML = '';
+  const name = findPlayer(q); if (!name) { out.append(el('div', 'empty', `No player matching "${q}" has BetMGM props this week.`)); return; }
+  const P = DATA.props[name], L = DATA.logs[name];
+  const ph = el('div', 'ph'); const nm = el('div'); nm.append(el('h2', null, name), el('span', null, [(P && P.team) || (L && L.team) || '', P ? P.game + ' · ' + P.kickoff : ''].filter(Boolean).join('  ·  '))); ph.append(nm); out.append(ph);
+  const ml = P ? marketLines(P) : [];
+  if (ml.length && L) {
+    const chips = el('div', 'chips'), card = el('div', 'card');
+    const show = (m, b) => { chips.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); const c = chart(L.games, m), pct = c.n ? Math.round((100 * c.hits) / c.n) : 0;
+      card.innerHTML = ''; const hr = el('div', 'hr'); hr.append(el('span', 'big ' + (pct >= 70 ? 'good' : pct >= 50 ? 'meh' : 'bad'), pct + '%'), el('span', 'lab', `${c.hits} of ${c.n} over ${m.line}`), el('span', 'lab', `avg ${c.avg.toFixed(1)}`), el('span', 'lab', `BetMGM ${m.price || '—'}`));
+      const d = el('div'); d.innerHTML = c.svg; card.append(el('div', 'lab', m.label), hr, d); };
+    ml.forEach((m, i) => { const b = el('button'); b.type = 'button'; b.append(document.createTextNode(m.label), el('small', null, m.price || '')); b.addEventListener('click', () => show(m, b)); chips.append(b); if (!i) setTimeout(() => show(m, b)); });
+    out.append(chips, card);
+  } else out.append(el('p', 'notice', P ? 'No last-10 log to chart for him yet.' : 'No open BetMGM props for him this week.'));
+  if (P) { const c = el('div', 'card'); c.append(el('div', 'lab', 'Every BetMGM market'));
+    const t = el('table', 'gl'); P.markets.forEach((m) => { const r = el('tr'); r.append(el('td', null, m.market), el('td', null, m.options.filter((o) => o.price).map((o) => `${o.option} ${o.price}`).join('   '))); t.append(r); });
+    const w = el('div', 'tablewrap'); w.append(t); c.append(w); out.append(c); }
+  if (L) { const used = ['receptions', 'receivingTargets', 'receivingYards', 'receivingTouchdowns', 'rushingAttempts', 'rushingYards', 'rushingTouchdowns', 'completions', 'passingAttempts', 'passingYards', 'passingTouchdowns', 'interceptions'].filter((k) => L.games.some((g) => g.s[k]));
+    const label = { receptions: 'Rec', receivingTargets: 'Tgt', receivingYards: 'Rec Yds', receivingTouchdowns: 'Rec TD', rushingAttempts: 'Rush Att', rushingYards: 'Rush Yds', rushingTouchdowns: 'Rush TD', completions: 'Cmp', passingAttempts: 'Att', passingYards: 'Pass Yds', passingTouchdowns: 'Pass TD', interceptions: 'INT' };
+    const t = el('table', 'gl'), hr = el('tr'); ['Game', 'Result', ...used.map((k) => label[k])].forEach((h) => hr.append(el('th', null, h))); t.append(hr);
+    L.games.forEach((g) => { const r = el('tr'); r.append(el('td', null, `${g.d}  ${g.at === '@' ? '@' : 'vs'} ${g.opp}`), el('td', null, g.res)); used.forEach((k) => r.append(el('td', null, String(g.s[k] || 0)))); t.append(r); });
+    const c = el('div', 'card'), w = el('div', 'tablewrap'); w.append(t); c.append(el('div', 'lab', 'Last 10 games'), w); out.append(c); }
+}
+$('#xgo').addEventListener('click', () => explore($('#xp').value));
+$('#xp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); explore($('#xp').value); } });
+$('#xp').addEventListener('input', async () => { await ready; const n = norm($('#xp').value), list = $('#xlist'); list.innerHTML = '';
+  if (n.length < 2) { list.hidden = true; return; }
+  Object.entries(DATA.props).filter(([k]) => norm(k).includes(n)).slice(0, 8).forEach(([k, v]) => { const b = el('button'); b.type = 'button'; b.append(document.createTextNode(k), el('small', null, v.game)); b.addEventListener('click', () => { $('#xp').value = k; explore(k); }); list.append(b); });
+  list.hidden = !list.childNodes.length; });
+
+// ---------- pick support ----------
+let SG = null;
+async function drawSupport() {
+  await ready; const box = $('#sgames'); if (box.childNodes.length) return;
+  const S = DATA.support || {};
+  Object.entries(S).forEach(([k, g]) => { const b = el('button'); b.type = 'button'; b.setAttribute('aria-pressed', 'false'); b.append(document.createTextNode(`${g.away} @ ${g.home}`), el('small', null, `${g.kickoff} · ${g.spread ? g.away + ' ' + g.spread[0] : ''}${g.total ? ' · O/U ' + g.total : ''}`));
+    b.addEventListener('click', () => { box.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); SG = k; drawSides(); }); box.append(b); });
+  if (!Object.keys(S).length) box.append(el('div', 'empty', 'No games with BetMGM lines yet.'));
+}
+function drawSides(choice) {
+  const g = DATA.support[SG], out = $('#sout'); out.innerHTML = '';
+  const sides = el('div', 'sides'), opts = [[g.away, `${g.away} ${g.spread ? g.spread[0] : ''}`, 'spread'], [g.home, `${g.home} ${g.spread ? g.spread[1] : ''}`, 'spread'], ['OVER', `Over ${g.total || ''}`, 'total'], ['UNDER', `Under ${g.total || ''}`, 'total']];
+  opts.forEach(([key, label, kind]) => { const b = el('button'); b.type = 'button'; b.setAttribute('aria-pressed', String(key === choice)); b.append(document.createTextNode(label), el('small', null, kind === 'spread' ? 'BetMGM spread' : 'BetMGM total'));
+    b.addEventListener('click', () => drawSides(key)); sides.append(b); });
+  out.append(sides);
+  if (!choice) { out.append(el('p', 'notice', 'Tap your pick.')); return; }
+  const F = (g.facts || {})[choice] || [];
+  const list = el('div', 'facts');
+  F.forEach((f) => { const b = el('div', 'lt'); b.append(el('span', 'lt-tag', f.tag), el('span', 'lt-txt', f.text)); list.append(b); });
+  if (!F.length) list.append(el('div', 'empty', 'No strong supporting trends for this side. The numbers lean the other way, so check the other options.'));
+  out.append(list);
+  if (F.length) { const row = el('div', 'copyrow'), btn = el('button', 'btn'), note = el('span', 'notice'); btn.type = 'button'; btn.textContent = 'Copy facts';
+    const txt = `${opts.find((o) => o[0] === choice)[1]} — ${g.game}\n` + F.map((f) => `• ${f.tag}: ${f.text}`).join('\n');
+    btn.addEventListener('click', async () => { try { await navigator.clipboard.writeText(txt); note.textContent = 'Copied'; } catch (e) { note.textContent = 'Copy blocked here. Select the facts above instead.'; } });
+    row.append(btn, note); out.append(row); }
+}
+document.querySelector('nav button[data-p=support]').addEventListener('click', drawSupport);
+TOOLS.splice(1, 0, { name: 'pick_support', description: 'The strongest facts supporting one pick in this week\'s game: side = a team abbreviation (e.g. CHI) for its spread, or OVER / UNDER for the total. Returns lower-third style facts {tag, text}, all computed from real results.',
+  inputSchema: { type: 'object', properties: { team: { type: 'string', description: 'either team in the game' }, side: { type: 'string' } }, required: ['team', 'side'] },
+  execute: (i) => { const a = teamAbbr(String(i.team)); const k = Object.keys(DATA.support || {}).find((x) => x.split('@').includes(a)); if (!k) throw new Error('No game this week for ' + i.team);
+    const g = DATA.support[k]; let sd = String(i.side).toUpperCase(); if (!['OVER', 'UNDER'].includes(sd)) sd = teamAbbr(sd) || sd; return { game: g.game, pick: sd, facts: (g.facts || {})[sd] || [] }; } });
+
+// ---------- lines ----------
+let drawn = false;
+async function drawGames() {
+  if (drawn) return; await ready; drawn = true; const box = $('#glist'); box.innerHTML = '';
+  if (!(DATA.games || []).length) { box.append(el('div', 'empty', 'No BetMGM lines posted yet.')); return; }
+  DATA.games.forEach((g) => {
+    const c = el('button', 'g'); c.type = 'button'; c.append(el('div', 'ko', (g.live ? 'LIVE · ' : '') + g.kickoff), el('div'), el('div', 'h', 'SPREAD'), el('div', 'h', 'TOTAL'), el('div', 'h', 'MONEY'));
+    [['away', 0, 'O '], ['home', 1, 'U ']].forEach(([side, i, ou]) => { const t = el('div', 't'); t.append(el('span', 'ab', g[side + '_abbr'] || ''), el('span', null, g[side].split(' ').slice(-1)[0]));
+      c.append(t, el('div', 'v', g.spread ? g.spread[i] : '—'), el('div', 'v', g.total ? ou + g.total : '—'), el('div', 'v', g.moneyline ? g.moneyline[i] : '—')); });
+    c.addEventListener('click', () => { document.querySelector('nav button[data-p=chat]').click(); ask(`Break down ${g.game} using the BetMGM lines. Best side or total, and the best player prop?`); });
+    box.append(c);
+  });
+}
+// ---------- NBA due board (data/nba.json, rebuilt every 30 min on the Mac from BetMGM NBA props + ESPN game logs) ----------
+const pct = (x) => Math.round(100 * x) + '%', us = (o) => o == null ? '—' : (o > 0 ? '+' : '') + o;
+const nwhy = (a) => `Normally clears <b>${a.line} ${a.short}</b> in <b>${pct(a.Hb)}</b> of games (${a.mub} avg) · <i>${Math.round(a.H5 * 5)} of his last 5</i> (${a.mu5}) · minutes ${a.min5} vs ${a.minb}`;
+function nlast5(a) { const r = el('div', 'l5'); a.last10.slice(0, 5).forEach((g) => { const s = el('span', g.v > a.line ? 'hit' : '', String(g.v)); s.append(el('small', null, 'vs ' + g.opp)); s.title = `${g.d}: ${g.v} ${a.short} in ${g.min} min (line ${a.line})`; r.append(s); }); return r; }
+function nchart(a) {
+  const G = a.last10.slice().reverse(), W = 760, H = 220, pad = 30, top = Math.max(a.line * 1.6, ...G.map((g) => g.v), 1), bw = (W - 2 * pad) / Math.max(G.length, 1), y = (v) => H - 28 - (v / top) * (H - 56);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Last 10 games against the line">`;
+  G.forEach((g, i) => { s += `<rect x="${pad + i * bw + bw * .18}" y="${y(g.v)}" width="${bw * .64}" height="${Math.max(2, H - 28 - y(g.v))}" rx="4" fill="${g.v > a.line ? '#18c964' : '#ff4d5e'}"><title>${g.d} vs ${g.opp}: ${g.v} (${g.min} min)</title></rect>`;
+    s += `<text x="${pad + i * bw + bw / 2}" y="${y(g.v) - 6}" text-anchor="middle">${g.v}</text><text x="${pad + i * bw + bw / 2}" y="${H - 10}" text-anchor="middle">${g.opp}</text>`; });
+  return s + `<line x1="${pad}" x2="${W - pad}" y1="${y(a.line)}" y2="${y(a.line)}" stroke="#fff" stroke-dasharray="6 5" stroke-width="2"></line><text x="${W - pad}" y="${y(a.line) - 6}" text-anchor="end">line ${a.line}</text></svg>`;
+}
+function nplayer(name) {
+  const N = DATA.nba, p = N.players && N.players[name], out = $('#nout'); out.innerHTML = ''; $('#nlist').hidden = true;
+  if (!p) { out.append(el('div', 'empty', 'No open BetMGM NBA props for that player right now.')); return; }
+  const ph = el('div', 'ph'); const nm = el('div'); nm.append(el('h2', null, name), el('span', null, `${p.abbr} · ${p.game}` + (p.injury ? '  ·  ' + p.injury : ''))); ph.append(nm); out.append(ph);
+  const chips = el('div', 'chips'), card = el('div', 'card');
+  const show = (a, b) => { chips.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); card.innerHTML = '';
+    const t = el('div', 'lab', `${a.stat} · over ${a.line}`); if (a.due) t.append(el('span', 'duelab', 'DUE'));
+    const hr = el('div', 'hr'); hr.append(el('span', 'big ' + (a.due ? 'good' : a.Hb >= .55 ? 'meh' : 'bad'), pct(a.Hb)), el('span', 'lab', `normal hit rate on o${a.line} (${a.nb} games)`), el('span', 'lab', `last 5: ${Math.round(a.H5 * 5)}/5`), el('span', 'lab', `BetMGM o ${us(a.over)} / u ${us(a.under)}`));
+    const w = el('p', 'notice'); w.innerHTML = nwhy(a); const d = el('div'); d.innerHTML = nchart(a);
+    const tb = el('table', 'gl miss'), hd = el('tr'); ['Game', a.short, 'vs line', 'Minutes'].forEach((x) => hd.append(el('th', null, x))); tb.append(hd);
+    a.last10.slice(0, 5).forEach((g) => { const r = el('tr'), df = g.v - a.line, c = 'v' + (g.v > a.line ? ' hit' : ''); r.append(el('td', null, `${g.d}  vs ${g.opp}`), el('td', c, String(g.v)), el('td', c, (df > 0 ? '+' : '') + df.toFixed(1)), el('td', null, String(g.min))); tb.append(r); });
+    const tw = el('div', 'tablewrap'); tw.append(tb);
+    card.append(t, hr, w, d, el('div', 'lab', `Last 5 games vs o${a.line}: ${Math.round(a.H5 * 5)} hit, ${5 - Math.round(a.H5 * 5)} missed`), tw); };
+  p.props.forEach((a, i) => { const b = el('button'); b.type = 'button'; b.append(document.createTextNode(`${a.short} o${a.line}`), el('small', null, a.due ? 'DUE' : us(a.over))); b.addEventListener('click', () => show(a, b)); chips.append(b); if (!i) setTimeout(() => show(a, b)); });
+  out.append(chips, card); out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+let ndrawn = false;
+async function drawNBA() {
+  if (ndrawn) return; await ready; ndrawn = true; const N = DATA.nba || {}, box = $('#ntop'); box.innerHTML = '';
+  if (!(N.top || []).length) { box.append(el('div', 'empty', N.players ? "Nobody passes the due test on tonight's board yet. Props post through the day." : 'The NBA board is not available right now.')); return; }
+  N.top.forEach((t, i) => {
+    const c = el('button', 'dc'); c.type = 'button'; const im = el('img'); im.src = t.headshot; im.alt = ''; im.onerror = () => { im.style.visibility = 'hidden'; };
+    const nm = el('div'); nm.append(el('div', 'rk', '#' + (i + 1) + ' MOST DUE')); const n = el('div', 'nm', t.player); n.append(el('small', null, `${t.team} vs ${(t.opp || '').split(' ').pop()}`)); nm.append(n); if (t.injury) nm.append(el('div', 'inj', t.injury.toUpperCase()));
+    const pr = el('div', 'pr'); pr.append(el('b', null, `${t.short} o${t.line}`), el('span', null, 'BetMGM ' + us(t.over)));
+    const w = el('div', 'why'); w.innerHTML = nwhy(t); c.append(im, nm, pr, w);
+    const full = ((N.players[t.player] || {}).props || []).find((a) => a.stat === t.stat); if (full) c.append(nlast5(full));
+    c.addEventListener('click', () => nplayer(t.player)); box.append(c);
+  });
+  $('#nfoot').textContent = `${N.props} BetMGM props across ${Object.keys(N.players).length} players · "normal" = last ~40 games, this season + last · updated ${N.updated}`;
+}
+const nfind = (q) => { const n = norm(q), K = Object.keys((DATA.nba || {}).players || {}); return K.find((k) => norm(k) === n) || K.find((k) => norm(k).includes(n)) || null; };
+$('#ngo').addEventListener('click', async () => { await ready; nplayer(nfind($('#np').value)); });
+$('#np').addEventListener('keydown', async (e) => { if (e.key === 'Enter') { e.preventDefault(); await ready; nplayer(nfind($('#np').value)); } });
+$('#np').addEventListener('input', async () => { await ready; const n = norm($('#np').value), list = $('#nlist'); list.innerHTML = '';
+  if (n.length < 2) { list.hidden = true; return; }
+  Object.entries((DATA.nba || {}).players || {}).filter(([k]) => norm(k).includes(n)).slice(0, 8).forEach(([k, v]) => { const b = el('button'); b.type = 'button'; b.append(document.createTextNode(k), el('small', null, v.game)); b.addEventListener('click', () => { $('#np').value = k; nplayer(k); }); list.append(b); });
+  list.hidden = !list.childNodes.length; });
+</script>
+
+</html>
