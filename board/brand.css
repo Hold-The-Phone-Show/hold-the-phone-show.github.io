@@ -226,3 +226,9 @@ body.v-rotate.pane-picks:not(.bets) .tm { letter-spacing:.08vh !important; font-
 .gp-list > .gp { gap:1.1vh !important; padding:1.4vh 3vh !important; }
 .gp-facts .lt-txt { font-size:5.2vh !important; padding:.6vh 2.2vh !important; } .gp-facts .lt-tag { font-size:4vh !important; }
 .gp-stat strong { font-size:7.4vh !important; } .gp-stat { padding:.6vh 2vh !important; }
+/* bigger top titles (Zach) */
+.wrap { grid-template-rows:13vh 1fr !important; } header .badge { height:11.5vh !important; width:11.5vh !important; }
+.hdr-mid { font-size:8vh !important; letter-spacing:.3vh !important; } .clock { font-size:8vh !important; }
+.wrap { grid-template-columns:minmax(0,1fr) !important; } header { overflow:hidden; min-width:0; }
+.hdr-mid { flex:1 1 0 !important; min-width:0 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.od .t { font-size:4.8vh !important; } .od .t img { width:4.8vh !important; height:4.8vh !important; } .od .col span { font-size:5vh !important; }
