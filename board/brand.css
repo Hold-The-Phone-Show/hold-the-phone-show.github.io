@@ -207,3 +207,12 @@ body.pane-insights main, body.pane-htp main { padding-bottom:2.5vh !important; }
 /* records: big but on screen */
 #records > .r-top { flex:1; } .r-top .big { font-size:11vh !important; } .r-top .main .big { font-size:15vh !important; } .r-grid .big { font-size:8vh !important; }
 .r-top .nm, .r-grid .nm { font-size:3.4vh !important; } .r-top .main .nm { font-size:4.2vh !important; } .r-top .sub, .r-grid .sub { font-size:3vh !important; }
+
+/* ---- pass 6: big AND fully on screen ---- */
+.gp-list > .gp { gap:1.4vh !important; padding:1.6vh 3vh !important; justify-content:space-between !important; }
+.gp-team b { font-size:8.6vh !important; } .gp-rec { font-size:7.4vh !important; } .gp-team img { width:11vh !important; height:11vh !important; }
+.gp-stat strong { font-size:8vh !important; } .gp-stat span { font-size:4.4vh !important; } .gp-stat { padding:1vh 2vh !important; }
+.gp-facts .lt:nth-child(n+3) { display:none !important; } .gp-facts .lt-txt { font-size:6vh !important; } .gp-facts .lt-tag { font-size:4.6vh !important; }
+.bn.hero .br { font-size:28vh !important; } .bn .br { font-size:12vh !important; } .bn .bl { font-size:4.2vh !important; } .bn .bp { font-size:4vh !important; }
+body.v-rotate.pane-picks:not(.bets) .tm { letter-spacing:.08vh !important; font-size:5.4vh !important; }
+.r-top .big { font-size:9vh !important; } .r-top .main .big { font-size:12vh !important; } .r-grid .big { font-size:6.6vh !important; }
