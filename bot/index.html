@@ -129,6 +129,7 @@
     <button data-p="explore" aria-pressed="false">Prop Explorer</button>
     <button data-p="games" aria-pressed="false">This Week's Lines</button>
     <button data-p="nba" aria-pressed="false">NBA Due</button>
+    <button data-p="pts" aria-pressed="false">NBA Points</button>
     <div class="foot">Odds: BetMGM only.<br>Trends: last-10 game logs.<br><span id="upd"></span><br>21+. Gamble responsibly.<br>1-800-GAMBLER</div>
   </nav>
   <main>
@@ -169,6 +170,11 @@
       <div class="due" id="ntop"><div class="empty">Loading the NBA board…</div></div>
       <p class="notice" id="nfoot"></p>
     </section>
+    <section id="pts" class="pane" hidden>
+      <h1>NBA <em>Points</em></h1>
+      <p class="sub">Points only: the 15 players most due to go over their BetMGM points line tonight. Same test as NBA Due, so they normally clear it, are cold on it lately, and are still playing their minutes.</p>
+      <div class="due" id="ptop"><div class="empty">Loading the NBA board…</div></div>
+    </section>
   </main>
 </div>
 
@@ -185,6 +191,7 @@ document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click
   document.querySelectorAll('section.pane').forEach((s) => { s.hidden = s.id !== b.dataset.p; });
   if (b.dataset.p === 'games') drawGames();
   if (b.dataset.p === 'nba') drawNBA();
+  if (b.dataset.p === 'pts') drawPts();
 }));
 
 // ---------- lookups (shared by the chat tools and the explorer) ----------
@@ -431,7 +438,7 @@ function nchart(a) {
     s += `<text x="${pad + i * bw + bw / 2}" y="${y(g.v) - 6}" text-anchor="middle">${g.v}</text><text x="${pad + i * bw + bw / 2}" y="${H - 10}" text-anchor="middle">${g.opp}</text>`; });
   return s + `<line x1="${pad}" x2="${W - pad}" y1="${y(a.line)}" y2="${y(a.line)}" stroke="#fff" stroke-dasharray="6 5" stroke-width="2"></line><text x="${W - pad}" y="${y(a.line) - 6}" text-anchor="end">line ${a.line}</text></svg>`;
 }
-function nplayer(name) {
+function nplayer(name, stat) {
   const N = DATA.nba, p = N.players && N.players[name], out = $('#nout'); out.innerHTML = ''; $('#nlist').hidden = true;
   if (!p) { out.append(el('div', 'empty', 'No open BetMGM NBA props for that player right now.')); return; }
   const ph = el('div', 'ph'); const nm = el('div'); nm.append(el('h2', null, name), el('span', null, `${p.abbr} · ${p.game}` + (p.injury ? '  ·  ' + p.injury : ''))); ph.append(nm); out.append(ph);
@@ -444,22 +451,31 @@ function nplayer(name) {
     a.last10.slice(0, 5).forEach((g) => { const r = el('tr'), df = g.v - a.line, c = 'v' + (g.v > a.line ? ' hit' : ''); r.append(el('td', null, `${g.d}  vs ${g.opp}`), el('td', c, String(g.v)), el('td', c, (df > 0 ? '+' : '') + df.toFixed(1)), el('td', null, String(g.min))); tb.append(r); });
     const tw = el('div', 'tablewrap'); tw.append(tb);
     card.append(t, hr, w, d, el('div', 'lab', `Last 5 games vs o${a.line}: ${Math.round(a.H5 * 5)} hit, ${5 - Math.round(a.H5 * 5)} missed`), tw); };
-  p.props.forEach((a, i) => { const b = el('button'); b.type = 'button'; b.append(document.createTextNode(`${a.short} o${a.line}`), el('small', null, a.due ? 'DUE' : us(a.over))); b.addEventListener('click', () => show(a, b)); chips.append(b); if (!i) setTimeout(() => show(a, b)); });
+  p.props.forEach((a, i) => { const b = el('button'); b.type = 'button'; b.append(document.createTextNode(`${a.short} o${a.line}`), el('small', null, a.due ? 'DUE' : us(a.over))); b.addEventListener('click', () => show(a, b)); chips.append(b); if (i === Math.max(0, p.props.findIndex((x) => x.stat === stat))) setTimeout(() => show(a, b)); });
   out.append(chips, card); out.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
-let ndrawn = false;
-async function drawNBA() {
-  if (ndrawn) return; await ready; ndrawn = true; const N = DATA.nba || {}, box = $('#ntop'); box.innerHTML = '';
-  if (!(N.top || []).length) { box.append(el('div', 'empty', N.players ? "Nobody passes the due test on tonight's board yet. Props post through the day." : 'The NBA board is not available right now.')); return; }
-  N.top.forEach((t, i) => {
+function ncards(N, list, box, open) {   // one card per player: prop, BetMGM price, why-line and his last 5
+  list.forEach((t, i) => {
     const c = el('button', 'dc'); c.type = 'button'; const im = el('img'); im.src = t.headshot; im.alt = ''; im.onerror = () => { im.style.visibility = 'hidden'; };
     const nm = el('div'); nm.append(el('div', 'rk', '#' + (i + 1) + ' MOST DUE')); const n = el('div', 'nm', t.player); n.append(el('small', null, `${t.team} vs ${(t.opp || '').split(' ').pop()}`)); nm.append(n); if (t.injury) nm.append(el('div', 'inj', t.injury.toUpperCase()));
     const pr = el('div', 'pr'); pr.append(el('b', null, `${t.short} o${t.line}`), el('span', null, 'BetMGM ' + us(t.over)));
     const w = el('div', 'why'); w.innerHTML = nwhy(t); c.append(im, nm, pr, w);
     const full = ((N.players[t.player] || {}).props || []).find((a) => a.stat === t.stat); if (full) c.append(nlast5(full));
-    c.addEventListener('click', () => nplayer(t.player)); box.append(c);
+    c.addEventListener('click', () => open(t)); box.append(c);
   });
+}
+let ndrawn = false;
+async function drawNBA() {
+  if (ndrawn) return; await ready; ndrawn = true; const N = DATA.nba || {}, box = $('#ntop'); box.innerHTML = '';
+  if (!(N.top || []).length) { box.append(el('div', 'empty', N.players ? "Nobody passes the due test on tonight's board yet. Props post through the day." : 'The NBA board is not available right now.')); return; }
+  ncards(N, N.top, box, (t) => nplayer(t.player));
   $('#nfoot').textContent = `${N.props} BetMGM props across ${Object.keys(N.players).length} players · "normal" = last ~40 games, this season + last · updated ${N.updated}`;
+}
+let pdrawn = false;
+async function drawPts() {
+  if (pdrawn) return; await ready; pdrawn = true; const N = DATA.nba || {}, box = $('#ptop'); box.innerHTML = '';
+  if (!(N.top_pts || []).length) { box.append(el('div', 'empty', N.players ? "Nobody is due on points on tonight's board yet." : 'The NBA board is not available right now.')); return; }
+  ncards(N, N.top_pts, box, (t) => { document.querySelector('nav button[data-p=nba]').click(); nplayer(t.player, t.stat); });
 }
 const nfind = (q) => { const n = norm(q), K = Object.keys((DATA.nba || {}).players || {}); return K.find((k) => norm(k) === n) || K.find((k) => norm(k).includes(n)) || null; };
 $('#ngo').addEventListener('click', async () => { await ready; nplayer(nfind($('#np').value)); });
