@@ -1,0 +1,137 @@
+<!doctype html>
+<!-- HTP grid card (1174x1444) — the HTML twin of streak_card.py: a grid of games, e.g. "9 UPSETS".
+     Data comes in as window.CFG + window.TEAMS (render.mjs inlines them), animation is seek(t) so every
+     render is frame-exact: kicker pops, sub line wipes, tiles land 0.22s apart, the count ticks up. -->
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: TB; src: url("https://fonts.gstatic.com/s/anton/v27/1Ptgg87LROyAm3Kz-C8CSKlv.woff2") format("woff2"); }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1174px; height: 1444px; overflow: hidden; background: transparent; }
+#card { position: absolute; inset: 0; overflow: hidden; font-family: TB; color: #fff;
+  background: linear-gradient(#1c2c7c, #0a0f30); }
+#card::before { content: ''; position: absolute; inset: 0; opacity: .06; mix-blend-mode: overlay;
+  background: url("assets/turf_strip.png"); }
+#card::after { content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(100.2deg, transparent 0 229.9px, rgba(255,255,255,.024) 229.9px 231.3px); }
+.t { position: absolute; white-space: nowrap; line-height: 1; text-box: trim-both cap alphabetic; transform-origin: 50% 50%; }
+.abs { position: absolute; }
+.pill { position: absolute; background: #ce0e29; border-radius: 999px; }
+.tile { position: absolute; border-radius: 20px; overflow: visible; }
+.tile .bg { position: absolute; inset: 0; border-radius: 20px; box-shadow: 0 8px 24px rgba(2,4,18,.65); }
+.tile .ring { position: absolute; inset: 0; border-radius: 20px; border: 2.5px solid rgba(255,255,255,.85); }
+.tile .fl { position: absolute; inset: 0; border-radius: 20px; background: #fff; opacity: 0; }
+.tile img { position: absolute; object-fit: contain; }
+.lose { filter: grayscale(1) brightness(1.15) contrast(.55); opacity: .75; }
+.stamp { position: absolute; width: 116px; height: 30px; border-radius: 15px; background: #fff; }
+.glint { color: transparent; -webkit-background-clip: text; background-clip: text;
+  background-image: linear-gradient(114deg, transparent 40%, rgba(255,255,255,.6) 50%, transparent 60%); background-size: 300% 100%; }
+</style></head>
+<body><div id="card"></div>
+<script>
+const CFG = window.CFG, TEAMS = window.TEAMS;
+const STAMP = CFG.stamp || 'OUTRIGHT W', VS = CFG.vs || 'DEF.';
+const GX0 = 52, GY0 = 486, TW = 342, TH = 296, GAP = 18, RED = '#ce0e29';
+const card = document.getElementById('card');
+let CAPR = 0.7;   // cap height / font size for Tungsten, measured once the font is in
+
+const mix = (a, b, t) => a.map((v, i) => Math.round(v * (1 - t) + b[i] * t));
+const rgb = c => `rgb(${c.join(',')})`;
+const clamp = x => Math.min(Math.max(x, 0), 1);
+const prog = (t, t0, d) => clamp((t - t0) / d);
+const eo = x => 1 - (1 - clamp(x)) ** 3;
+const eoExpo = x => (x = clamp(x)) >= 1 ? 1 : 1 - 2 ** (-10 * x);
+const eoBack = (x, k = 1.7) => (x = clamp(x), 1 + (k + 1) * (x - 1) ** 3 + k * (x - 1) ** 2);
+
+function el(tag, cls, parent, css) { const e = document.createElement(tag); if (cls) e.className = cls; Object.assign(e.style, css || {}); (parent || card).appendChild(e); return e; }
+// text centred on (x, y) by cap height, like streak_card.text(): cap px tall, track px between letters, shrinks past maxw
+function txt(s, x, y, cap, o = {}) {
+  const e = el('div', 't', o.parent, { left: x + 'px', top: y + 'px', fontSize: cap / CAPR + 'px', letterSpacing: (o.track || 0) + 'px',
+    paddingLeft: (o.track || 0) + 'px', color: o.color || '#fff', textShadow: o.shadow || 'none' });
+  e.textContent = s; e.base = 'translate(-50%,-50%)'; e.style.transform = e.base;
+  if (o.maxw && e.offsetWidth > o.maxw) e.style.fontSize = cap / CAPR * o.maxw / e.offsetWidth + 'px';
+  return e;
+}
+function logoSrc(a) { return `logos/${a}.png`; }
+function grid(n, x0, y0, tw, gh, gap, cols = 3) {
+  const rows = Math.ceil(n / cols), th = (gh - gap * (rows - 1)) / rows, out = [];
+  for (let i = 0; i < n; i++) { const r = Math.floor(i / cols), c = i % cols, inrow = Math.min(cols, n - r * cols), off = (cols - inrow) * (tw + gap) / 2;
+    out.push([x0 + off + c * (tw + gap), y0 + r * (th + gap), tw, th]); }
+  return out;
+}
+function setT(e, { s = 1, dy = 0, a = 1 } = {}) { e.style.transform = `${e.base || ''} translateY(${dy}px) scale(${s})`; e.style.opacity = a; }
+function wipe(e, mode, p) {   // 24px soft edge, like Elem.place(wipe=...)
+  const w = e.offsetWidth, edge = 24 / Math.max(w, 1) * 100;
+  if (p >= 1) { e.style.webkitMaskImage = 'none'; return; }
+  if (mode === 'right') { const q = p * 100; e.style.webkitMaskImage = `linear-gradient(90deg,#000 ${q}%,transparent ${q + edge}%)`; }
+  else { const h = p * 50; e.style.webkitMaskImage = `linear-gradient(90deg,transparent ${50 - h - edge}%,#000 ${50 - h}%,#000 ${50 + h}%,transparent ${50 + h + edge}%)`; }
+}
+
+let E = {};
+function build() {
+  card.innerHTML = '';
+  const kick = el('div', 'pill', card, { left: '587px', top: '78px', height: '46px' });
+  const kt = txt(CFG.kicker, 0, 23, 26, { parent: kick, track: 3 });
+  kick.style.width = kt.offsetWidth + 44 + 'px'; kt.style.left = (kt.offsetWidth + 44) / 2 + 'px';
+  kick.base = 'translate(-50%,-50%)';
+  const m = /^(\d+)(.*)$/.exec(CFG.big);
+  const big = txt(CFG.big, 587, 205, 150, { track: 3, shadow: '0 8px 20px rgba(2,4,18,.7)' });
+  const glint = txt(CFG.big, 587, 205, 150, { track: 3 }); glint.classList.add('glint');
+  const sub = txt(CFG.sub, 587, 340, 48, { track: 2, maxw: 1060, shadow: '0 4px 12px rgba(2,4,18,.6)' });
+  const ul = el('div', 'abs', card, { left: '497px', top: '392px', width: '180px', height: '6px', borderRadius: '3px', background: RED });
+  const n = CFG.games.length, extra = n > 9 ? 46 : 0, tiles = [];
+  grid(n, GX0, GY0 - extra, TW, 3 * TH + 2 * GAP + extra, GAP).forEach(([x, y, tw, th], i) => {
+    const g = CFG.games[i], tm = TEAMS[g.win], col = tm.color, dk = tm.dark || mix(col, [0, 0, 0], .7);
+    const sx = tw / TW, sy = th / TH, sm = Math.min(sx, sy);
+    const t = el('div', 'tile', card, { left: x + 'px', top: y + 'px', width: tw + 'px', height: th + 'px' });
+    el('div', 'bg', t, { background: `linear-gradient(${rgb(mix(col, [255, 255, 255], .06))}, ${rgb(mix(dk, [10, 15, 48], .3))})` });
+    el('div', 'ring', t);
+    txt(g.tag, tw / 2, 30 * sy, 22, { parent: t, track: 3, color: 'rgba(255,255,255,.9)' });
+    const wl = el('img', '', t, { left: 118 * sx - 75 * sm + 'px', top: 132 * sy - 75 * sm + 'px', width: 150 * sm + 'px', height: 150 * sm + 'px' }); wl.src = logoSrc(g.win);
+    txt(VS, 244 * sx, 98 * sy, 20, { parent: t, track: 2, color: 'rgba(220,226,240,.86)' });
+    const ll = el('img', 'lose', t, { left: 244 * sx - 37 * sm + 'px', top: 150 * sy - 37 * sm + 'px', width: 74 * sm + 'px', height: 74 * sm + 'px' }); ll.src = logoSrc(g.lose);
+    txt(g.score, tw / 2, 232 * sy, 46, { parent: t, track: 2 });
+    const fl = el('div', 'fl', t);
+    const st = el('div', 'stamp', t, { left: tw / 2 - 58 + 'px', top: th - 4 - 15 + 'px' });
+    txt(STAMP, 58, 15, 15, { parent: st, track: 2, color: RED });
+    tiles.push({ t, fl, st });
+  });
+  E = { kick, big, glint, sub, ul, tiles, m, n };
+}
+
+const T0 = 0.75, DT = 0.22;
+window.DURATION = () => T0 + DT * E.n + 1.6;
+window.seek = function (t) {
+  const { kick, big, glint, sub, ul, tiles, m, n } = E;
+  let p = prog(t, 0.05, 0.3); setT(kick, { s: 0.7 + 0.3 * eoBack(p), a: Math.min(1, p * 5) });
+  wipe(sub, 'right', eoExpo(prog(t, 0.3, 0.35)));
+  wipe(ul, 'center', eoExpo(prog(t, 0.45, 0.3)));
+  let landed = 0; for (let j = 0; j < n; j++) if (t >= T0 + DT * j + 0.12) landed++;
+  if (!landed) { setT(big, { a: 0 }); setT(glint, { a: 0 }); }
+  else {
+    const tj = T0 + DT * (landed - 1) + 0.12, s = 1.12 - 0.12 * eo(prog(t, tj, 0.14));
+    big.textContent = glint.textContent = m ? landed + m[2] : CFG.big;
+    setT(big, { s }); setT(glint, { s, a: landed === n ? 1 : 0 });
+    glint.style.backgroundPosition = `${100 - 100 * eo(prog(t, tj + 0.3, 0.5))}% 0`;
+    if (landed === n && prog(t, tj + 0.3, 0.5) >= 1) setT(glint, { a: 0 });
+  }
+  tiles.forEach(({ t: tl, fl, st }, j) => {
+    const q = prog(t, T0 + DT * j, 0.26), ee = eoExpo(q);
+    setT(tl, { s: 1.18 - 0.18 * ee, dy: -40 * (1 - ee), a: Math.min(1, q * 4) });
+    const land = prog(t, T0 + DT * j + 0.2, 0.12); fl.style.opacity = land > 0 ? 0.35 * (1 - land) : 0;
+    const sp = prog(t, T0 + DT * j + 0.16, 0.24); st.style.transform = `scale(${Math.max(1e-3, 0.4 + 0.6 * eoBack(sp, 2.2))})`; st.style.opacity = Math.min(1, sp * 5);
+  });
+};
+
+window.READY = (async () => {
+  await document.fonts.load('100px TB');
+  const c = document.createElement('canvas').getContext('2d'); c.font = '100px TB';
+  CAPR = c.measureText('H').actualBoundingBoxAscent / 100;
+  build();
+  await Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
+  seek(0);
+  if (!window.RENDER) {   // browser / OBS: loop it, or with HOLD play once and stay on the last frame
+    const t0 = performance.now(); (function loop() { const el = (performance.now() - t0) / 1000;
+      seek(window.HOLD ? Math.min(el, DURATION()) : el % (DURATION() + 1)); if (!window.HOLD || el < DURATION()) requestAnimationFrame(loop); })();
+  }
+})();
+</script></body></html>

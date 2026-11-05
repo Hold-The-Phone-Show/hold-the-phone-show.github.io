@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HTP Graphics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@500;600;700&display=swap">
+<style>
+/* control-room layout: brand header, one control strip per graphic, the 16:9 program monitor below */
+:root { --navy: #0a0f30; --navy2: #141d55; --panel: #10173f; --line: #27317a; --red: #ce0e29; --fg: #eef0fa; --dim: #9aa3cf;
+  --display: Anton, 'Arial Narrow', sans-serif; --body: Barlow, 'Helvetica Neue', Arial, sans-serif; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--navy); color: var(--fg); font: 500 16px/1.4 var(--body); }
+[hidden] { display: none !important; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 18px; }
+header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.badge { background: var(--red); color: #fff; font: 400 15px/1 var(--display); letter-spacing: .06em; padding: 8px 12px 7px; border-radius: 6px; border: 2px solid #fff; }
+h1 { margin: 0; font: 400 clamp(30px, 5vw, 46px)/1 var(--display); letter-spacing: .02em; text-wrap: balance; }
+header p { margin: 0; color: var(--dim); flex-basis: 100%; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tabs button { font: 400 18px/1 var(--display); letter-spacing: .04em; color: var(--dim); background: var(--panel); border: 2px solid var(--line); border-radius: 8px; padding: 11px 16px 10px; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: #fff; background: var(--red); border-color: #fff; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+label { font-weight: 700; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+input, select { font: 600 17px var(--body); color: var(--fg); background: var(--navy); border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+input.grow { flex: 1 1 260px; }
+.go { font: 400 18px/1 var(--display); letter-spacing: .05em; color: #fff; background: var(--red); border: 2px solid #fff; border-radius: 8px; padding: 12px 18px 11px; cursor: pointer; }
+.ghost { font: 600 14px var(--body); color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.ghost:hover, .tabs button:hover { border-color: #fff; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.msg { min-height: 1.4em; color: var(--dim); font-size: 14px; }
+.msg.err { color: #ff8a98; }
+.monitor { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 10px; overflow: hidden; border: 1px solid var(--line);
+  background: radial-gradient(120% 90% at 30% 20%, #3a4048, #15181d 70%); }
+.monitor iframe { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; background: transparent; }
+.under { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; color: var(--dim); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style></head>
+<body><div class="wrap">
+<header><span class="badge">HOLD THE PHONE</span><h1>HTP Graphics</h1>
+  <p>The show's animated graphics. Type any game or player and it plays the way it goes out on air. Lines are BetMGM's, refreshed every 15 minutes.</p></header>
+<div class="tabs" role="tablist">
+  <button role="tab" id="t-gp" aria-selected="true">GAME PICK</button>
+  <button role="tab" id="t-td" aria-selected="false">TOUCHDOWN SCORER</button>
+  <button role="tab" id="t-gr" aria-selected="false">GRID CARD</button>
+</div>
+<section class="panel" id="p-gp">
+  <div class="row"><label for="game">Game</label><input class="grow" id="game" placeholder="jags at ravens pick ravens" autocomplete="off">
+    <select id="pick" aria-label="The pick"><option value="">No pick</option><option value="away">Pick away</option><option value="home">Pick home</option></select>
+    <button class="go" id="gp-go">PLAY</button></div>
+  <div class="chips" id="chips"></div>
+  <div class="msg" id="gp-msg"></div>
+</section>
+<section class="panel" id="p-td" hidden>
+  <div class="row"><label for="players">Players</label><input class="grow" id="players" value="Puka Nacua, Jaylen Waddle" autocomplete="off">
+    <button class="go" id="td-go">PLAY</button></div>
+  <div class="row"><label for="title">Tab</label><input id="title" value="HTP · ANYTIME TD" autocomplete="off">
+    <span class="msg">Separate players with commas. Add <b>=2+ TDS</b> after a name to change its line, or use a team (KC) for a logo.</span></div>
+  <div class="msg" id="td-msg"></div>
+</section>
+<section class="panel" id="p-gr" hidden>
+  <div class="row"><label for="grid">Card</label><select id="grid"></select><button class="go" id="gr-go">PLAY</button></div>
+</section>
+<div class="monitor" id="mon"></div>
+<div class="under"><span id="now">Loading…</span><button class="ghost" id="replay">↻ Replay</button></div>
+</div>
+<script>
+const ALIAS = {ARI: 'cards cardinals arizona', ATL: 'falcons atlanta', BAL: 'ravens baltimore', BUF: 'bills buffalo', CAR: 'panthers carolina',
+  CHI: 'bears chicago', CIN: 'bengals cincinnati cincy', CLE: 'browns cleveland', DAL: 'cowboys dallas boys', DEN: 'broncos denver',
+  DET: 'lions detroit', GB: 'packers pack green bay', HOU: 'texans houston', IND: 'colts indianapolis indy', JAX: 'jaguars jags jacksonville jac',
+  KC: 'chiefs kansas city', LV: 'raiders las vegas vegas', LAC: 'chargers bolts', LAR: 'rams', MIA: 'dolphins fins phins miami',
+  MIN: 'vikings vikes minnesota', NE: 'patriots pats new england', NO: 'saints new orleans', NYG: 'giants g men', NYJ: 'jets',
+  PHI: 'eagles birds philadelphia philly', PIT: 'steelers pittsburgh', SF: '49ers niners san francisco sf', SEA: 'seahawks hawks seattle',
+  TB: 'buccaneers bucs tampa bay tampa', TEN: 'titans tennessee', WSH: 'commanders commies washington'};
+const KEYS = {};
+for (const [ab, al] of Object.entries(ALIAS)) { const w = al.split(' '); [ab.toLowerCase(), al, ...w].forEach(k => KEYS[k] = ab); for (let i = 0; i < w.length - 1; i++) KEYS[w[i] + ' ' + w[i + 1]] = ab; }
+function findTeams(text) {
+  const w = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean), out = []; let i = 0;
+  while (i < w.length) { let hit = false;
+    for (const L of [3, 2, 1]) { const ph = w.slice(i, i + L).join(' '); if (i + L <= w.length && KEYS[ph] && !['at', 'vs', 'v', 'pick'].includes(ph)) { if (!out.includes(KEYS[ph])) out.push(KEYS[ph]); i += L; hit = true; break; } }
+    if (!hit) i++; }
+  return out;
+}
+const $ = id => document.getElementById(id), mon = $('mon');
+let TEAMS, GAMES = [], LUTC, GRIDS = [], last = null;
+const SIZES = { gamepick: [1920, 1080], attd: [1920, 1080], grid_card: [1174, 1444] };
+async function mount(tpl, cfg, label) {
+  last = [tpl, cfg, label];
+  let src = await (await fetch(tpl + '.html')).text();
+  src = src.replace('<head>', '<head><style>:root{color-scheme:dark}</style>').replace('<body>', `<body><script>window.CFG=${JSON.stringify(cfg)};window.TEAMS=${JSON.stringify(TEAMS)};window.HOLD=true;window.IMG_PREFIX='';window.LUTC=${JSON.stringify(LUTC)};<\/script>`);
+  const [w, h] = SIZES[tpl]; mon.innerHTML = '';
+  const f = document.createElement('iframe'); f.width = w; f.height = h; f.title = label; f.style.width = w + 'px'; f.style.height = h + 'px';
+  mon.appendChild(f); fit(); f.srcdoc = src; $('now').textContent = label;
+}
+function fit() {
+  const f = mon.querySelector('iframe'); if (!f) return;
+  const W = mon.clientWidth, H = mon.clientHeight, w = +f.width, h = +f.height, k = Math.min(W / 1920, H / 1080) * (w === 1920 ? 1 : 1080 / h);
+  f.style.transform = `scale(${k})`; f.style.left = (W - w * k) / 2 + 'px'; f.style.top = (H - h * k) / 2 + 'px';
+}
+addEventListener('resize', fit);
+$('replay').onclick = () => last && mount(...last);
+
+// ---- game pick: any game, BetMGM line from the bot's board
+function playGame() {
+  let text = $('game').value, pick = $('pick').value || null; const m = /\bpick(?:ing)?\s+(.+)$/i.exec(text);
+  if (m) { text = text.slice(0, m.index); const pt = findTeams(m[1])[0]; if (pt) pick = pt; }
+  const tm = findTeams(text), msg = $('gp-msg'); msg.className = 'msg';
+  if (!tm.length || tm.length > 2) { msg.className = 'msg err'; msg.textContent = 'Type a game like "jags at ravens" or "KC BUF" (one team works too).'; return; }
+  const g = GAMES.filter(g => tm.every(t => t === g.away_abbr || t === g.home_abbr)).sort((a, b) => a.start < b.start ? -1 : 1)[0];
+  if (!g) { msg.className = 'msg err'; msg.textContent = `${tm.join(' vs ')} isn't on BetMGM's board this week. Tap a game below.`; return; }
+  if (pick && pick !== 'away' && pick !== 'home') pick = pick === g.away_abbr ? 'away' : pick === g.home_abbr ? 'home' : null;
+  const [al, hl] = g.spread || ['PK', 'PK'];
+  msg.textContent = `BetMGM: ${g.away_abbr} ${al} @ ${g.home_abbr} ${hl} · ${g.kickoff}`;
+  mount('gamepick', { away: g.away_abbr, home: g.home_abbr, away_line: al, home_line: hl, time: g.kickoff, pick }, `${g.away_abbr} ${al} @ ${g.home_abbr}${pick ? ' · THE PICK: ' + (pick === 'home' ? g.home_abbr : g.away_abbr) : ''}`);
+}
+$('gp-go').onclick = playGame; $('game').onkeydown = e => { if (e.key === 'Enter') playGame(); };
+
+// ---- touchdown scorer: ESPN search + headshot, trimmed to the face/shoulders like htpcard does
+function loadImg(src) { return new Promise((r, j) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => r(i); i.onerror = j; i.src = src; }); }
+function trim(im, shoulders) {
+  const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data; let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  let w = x1 - x0 + 1, ox = x0; if (shoulders) { const cw = Math.round(w * .62); ox += Math.floor((w - cw) / 2); w = cw; }
+  const o = document.createElement('canvas'); o.width = w; o.height = y1 - y0 + 1; o.getContext('2d').drawImage(c, -ox, -y0); return o.toDataURL('image/png');
+}
+async function playTd() {
+  const msg = $('td-msg'); msg.className = 'msg'; msg.textContent = 'Finding players…';
+  const raw = $('players').value.split(',').map(s => s.trim()).filter(Boolean).slice(0, 6);
+  if (!raw.length) { msg.className = 'msg err'; msg.textContent = 'Type at least one player.'; return; }
+  try {
+    const slots = await Promise.all(raw.map(async r => {
+      const [who, line] = r.split('=').map(s => s.trim()), ab = who.toUpperCase();
+      if (TEAMS[ab]) return { team: ab, line: line || 'ML', img: trim(await loadImg(`logos/${ab}.png`)) };
+      const q = await (await fetch(`https://site.web.api.espn.com/apis/common/v3/search?query=${encodeURIComponent(who)}&type=player&sport=football&league=nfl&limit=5`)).json();
+      const it = (q.items || []).find(i => i.league === 'nfl'); if (!it) throw new Error(`ESPN has no NFL player named "${who}".`);
+      const im = await loadImg(`https://a.espncdn.com/combiner/i?img=/i/headshots/nfl/players/full/${it.id}.png&w=600&h=436`);
+      return { name: it.displayName, line: (line || 'ANYTIME TD').toUpperCase(), img: trim(im, raw.length > 4) };
+    }));
+    msg.textContent = 'Photos: ESPN.';
+    mount('attd', { title: $('title').value || 'HTP · ANYTIME TD', slots }, slots.map(s => s.name || s.team).join(', '));
+  } catch (e) { msg.className = 'msg err'; msg.textContent = e.message.startsWith('ESPN') ? e.message : 'Could not reach ESPN for the photos. Try again in a moment.'; }
+}
+$('td-go').onclick = playTd; $('players').onkeydown = e => { if (e.key === 'Enter') playTd(); };
+
+// ---- grid cards
+$('gr-go').onclick = () => { const c = GRIDS[$('grid').value]; c && mount('grid_card', c, `${c.big} · ${c.sub}`); };
+
+const tabs = { 't-gp': 'p-gp', 't-td': 'p-td', 't-gr': 'p-gr' }, run = { 't-gp': playGame, 't-td': playTd, 't-gr': () => $('gr-go').onclick() };
+for (const t in tabs) $(t).onclick = () => { for (const u in tabs) { $(u).setAttribute('aria-selected', u === t); $(tabs[u]).hidden = u !== t; } run[t](); };
+
+(async () => {
+  [TEAMS, LUTC, GRIDS] = await Promise.all(['teams.json', 'assets/gamepick/lut_curves.json', 'grids.json'].map(u => fetch(u).then(r => r.json())));
+  try { GAMES = await (await fetch('../bot/data/games.json', { cache: 'no-store' })).json(); } catch (e) { GAMES = []; }
+  const up = GAMES.filter(g => !g.live).sort((a, b) => a.start < b.start ? -1 : 1);
+  $('chips').innerHTML = up.map(g => `<button class="ghost" data-g="${g.away_abbr} at ${g.home_abbr}">${g.away_abbr} @ ${g.home_abbr} · ${g.kickoff}</button>`).join('');
+  $('chips').onclick = e => { const b = e.target.closest('button'); if (b) { $('game').value = b.dataset.g; playGame(); } };
+  $('grid').innerHTML = GRIDS.map((c, i) => `<option value="${i}">${c.big} · ${c.sub}</option>`).join('');
+  const g = up[0] || GAMES[0], h = location.hash.slice(1);
+  if (h === 'touchdown') $('t-td').onclick(); else if (h === 'grid') $('t-gr').onclick();
+  else if (g) { $('game').value = `${g.away_abbr} at ${g.home_abbr} pick ${g.home_abbr}`; playGame(); }
+  else { $('now').textContent = 'No games on the board right now.'; }
+})();
+</script></body></html>

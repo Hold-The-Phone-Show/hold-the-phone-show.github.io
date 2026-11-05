@@ -1,0 +1,155 @@
+<!doctype html>
+<!-- HTP game pick bar (1920x1080 lower third) — the HTML twin of htp.py gamepick + animate_htp.py bar/pick.
+     Static art is exported straight from HTP_GAME PICK TEMPLATE.psd (assets/gamepick/); team gradients are the PSD's
+     own gradient fills (angle / scale / lighter-color) and the PSD's Color Lookup is applied by render.mjs (meta lut).
+     CFG: {away, home, away_line, home_line, time, pick: "away"|"home"|null, out_name} -->
+<html><head><meta charset="utf-8">
+<meta name="lut" content="assets/gamepick/lut_hald8.png">
+<style>
+@font-face { font-family: TB; src: url("https://fonts.gstatic.com/s/anton/v27/1Ptgg87LROyAm3Kz-C8CSKlv.woff2") format("woff2"); }
+@font-face { font-family: TS; src: url("https://fonts.gstatic.com/s/anton/v27/1Ptgg87LROyAm3Kz-C8CSKlv.woff2") format("woff2"); }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+.full { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+.t { position: absolute; white-space: nowrap; line-height: 1; text-box: trim-both cap alphabetic; color: #fff; letter-spacing: .015em; }
+.clip { position: absolute; left: 315px; top: 954px; width: 1291px; height: 109px; overflow: hidden; }
+.clip img { position: absolute; object-fit: contain; }
+.grad { position: absolute; left: 315px; top: 954px; width: 1291px; height: 109px; mix-blend-mode: lighten; }
+.grey { backdrop-filter: grayscale(1); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+#picktab { position: absolute; top: 909px; height: 76px; border-radius: 9px; box-shadow: inset 0 0 0 3px #fff; overflow: hidden; }
+#picktab .fl { position: absolute; inset: 0; background: #fff; opacity: 0; }
+#sweep { position: absolute; left: 315px; top: 954px; width: 1291px; height: 109px; opacity: 0;
+  background: linear-gradient(105deg, transparent 0 45%, rgba(255,255,255,.5) 50%, transparent 55% 100%); background-size: 300% 100%; mix-blend-mode: screen; }
+</style></head>
+<body><div id="root" class="full"></div>
+<script>
+const CFG = window.CFG, TEAMS = window.TEAMS, A = 'assets/gamepick/';
+const root = document.getElementById('root');
+const clamp = x => Math.min(Math.max(x, 0), 1), prog = (t, t0, d) => clamp((t - t0) / d);
+const eo = x => 1 - (1 - clamp(x)) ** 3, eoExpo = x => (x = clamp(x)) >= 1 ? 1 : 1 - 2 ** (-10 * x);
+const eoBack = (x, k = 1.7) => (x = clamp(x), 1 + (k + 1) * (x - 1) ** 3 + k * (x - 1) ** 2);
+const mix = (a, b, t) => a.map((v, i) => Math.round(v * (1 - t) + b[i] * t));
+function el(tag, cls, parent, css) { const e = document.createElement(tag); if (cls) e.className = cls; Object.assign(e.style, css || {}); (parent || root).appendChild(e); return e; }
+function img(src, parent, cls = 'full') { const e = el('img', cls, parent); e.src = src; return e; }
+let CAPB = .7, CAPS = .7, K = 1;
+// text with its baseline at y; align 'l' | 'c' | 'r' on x (Photoshop paragraph text position)
+function txt(s, x, y, size, fam, parent, align = 'l', color = '#fff') {
+  const cap = size * (fam === 'TB' ? CAPB : CAPS);
+  const e = el('div', 't', parent, { fontFamily: fam, fontSize: size + 'px', top: y - cap + 'px', color });
+  e.textContent = s; const w = e.offsetWidth;
+  e.style.left = (align === 'l' ? x : align === 'c' ? x - w / 2 : x - w) + 'px'; return e;
+}
+// the PSD's gradient fills (align off = laid out on the 1920x1080 document): linear, color -> dark while opacity 100 -> 0,
+// `scale` % of the document's extent along the angle, centred at the fill's offset (% of the document), cut by the layer mask
+function grad(parent, c, d, psAngle, scale, offX, offY, mask) {
+  const r = psAngle * Math.PI / 180, a = (90 - psAngle + 360) % 360;
+  const len = (1920 * Math.abs(Math.cos(r)) + 1080 * Math.abs(Math.sin(r))) * scale / 100, S = 4000;
+  const L0 = S * (Math.abs(Math.cos(r)) + Math.abs(Math.sin(r))), h = len / 2 / L0 * 100, st = [];
+  for (let i = 0; i <= 8; i++) { const u = i / 8, col = mix(c, d, u); st.push(`rgba(${col.join(',')},${1 - u}) ${50 - h + u * 2 * h}%`); }
+  const w = el('div', 'full', parent, { mixBlendMode: 'lighten', overflow: 'hidden', webkitMaskImage: `url(${A}${mask}.png)` });
+  el('div', '', w, { position: 'absolute', width: S + 'px', height: S + 'px', left: 960 + 1920 * offX / 100 - S / 2 + 'px', top: 540 + 1080 * offY / 100 - S / 2 + 'px',
+    background: `linear-gradient(${a}deg, ${st.join(',')})` });
+}
+
+let E = {};
+function build() {
+  const aw = TEAMS[CFG.away], hm = TEAMS[CFG.home], pick = CFG.pick || null;
+  const shadow = img(A + 'shadow.png');
+  // THE PICK tab (behind the bar, like the PSD): picked team's color, centred over its logo, clear of the time tab
+  let picktab = null;
+  if (pick) {
+    const side = pick === 'home' ? hm : aw, cx = pick === 'home' ? 1206 : 721.5;
+    const light = .299 * side.color[0] + .587 * side.color[1] + .114 * side.color[2] > 150;
+    picktab = el('div', '', root, { background: `rgb(${side.color.join(',')})` }); picktab.id = 'picktab';
+    const pt = txt('THE PICK', 0, 942.86 - 909, 25.4 / CAPB, 'TB', picktab, 'l', light ? '#111' : '#fff');
+    const half = pt.offsetWidth / 2 + 50;   // the PSD sizes the tab off the text layer's bounds (glyphs + ~20px each side) + 30
+    let x0 = Math.round(cx - half), x1 = Math.round(cx + half), sh = 0;
+    if (x1 > 786 && x0 < 816) sh = 786 - x1; else if (x0 < 1134 && x1 > 1104) sh = 1134 - x0;
+    x0 += sh; x1 += sh;
+    Object.assign(picktab.style, { left: x0 + 'px', width: x1 - x0 + 'px' }); pt.style.left = (x1 - x0 - pt.offsetWidth) / 2 + 'px';
+    el('div', 'fl', picktab);
+  }
+  const tab = el('div', 'full'); img(A + 'center_tab.png', tab); img(A + 'betmgm.png', tab);
+  const tt = txt(CFG.time.toUpperCase(), 899.57, 944.66, 23.4 / CAPS, 'TS', tab, 'c');
+  if (tt.offsetWidth > 150) { tt.style.fontSize = parseFloat(tt.style.fontSize) * 150 / tt.offsetWidth + 'px'; tt.style.top = 944.66 - parseFloat(tt.style.fontSize) * CAPS + 'px'; tt.style.left = 899.57 - tt.offsetWidth / 2 + 'px'; }   // wider fallback fonts
+  const bar = el('div', 'full');
+  img(A + 'rect.png', bar);
+  grad(bar, hm.color, hm.dark, 101.8324, 16.9455, 15.4765, 44.1806, 'mask_home');
+  const hs = txt(CFG.home_line, 1531.8, 1044.36, 62.5 * K * .965, 'TB', bar, 'r');
+  const hc = el('div', 'clip', bar), hl = img(`logos/${CFG.home}.png`, hc, '');
+  Object.assign(hl.style, { left: 1206 - 134 - 315 + 'px', top: 1017.5 - 111.5 - 954 + 'px', width: '268px', height: '223px' });
+  const gh = pick === 'away' ? el('div', 'full grey', bar) : null;
+  const ac = el('div', 'clip', bar), al = img(`logos/${CFG.away}.png`, ac, '');
+  Object.assign(al.style, { left: 721.5 - 134 - 315 + 'px', top: 1004.5 - 111.5 - 954 + 'px', width: '268px', height: '223px' });
+  grad(bar, aw.color, aw.dark, 80.7232, 15.1090, -10.0601, 44.1569, 'mask_away');
+  const ga = pick === 'home' ? el('div', 'full grey', bar) : null;
+  const as = txt(CFG.away_line, 392.8, 1045.36, 62.5 * K * .965, 'TB', bar, 'l');
+  img(A + 'gloss.png', bar); const sweep = el('div', '', bar); sweep.id = 'sweep';
+  const at = img(A + 'at.png', bar); img(A + 'stroke.png', bar);
+  E = { shadow, picktab, tab, bar, as, hs, al, hl, at, sweep, grey: gh || ga, greyMask: gh ? 'grey_home' : 'grey_away', greyRight: !!gh, pick };
+  if (E.grey) E.grey.style.webkitMaskImage = 'none';
+}
+
+const P = 1.5;   // THE PICK starts once the bar has landed
+window.DURATION = () => E.pick ? P + 2.2 : 3.0;
+function tf(e, { dx = 0, dy = 0, s = 1, a = 1, origin } = {}) { e.style.transform = `translate(${dx}px,${dy}px) scale(${s})`; e.style.opacity = a; if (origin) e.style.transformOrigin = origin; }
+window.seek = function (t) {
+  const { shadow, picktab, tab, bar, as, hs, al, hl, at, sweep, grey, pick } = E;
+  // bar build: opens from the centre, tab rises from behind, logos punch in from their sides, @ slams, micro-shake
+  const pb = eoExpo(prog(t, 0, .5));
+  let sh = t >= .72 ? Math.max(0, 1 - prog(t, .72, .25)) : 0;
+  let jx = 6 * sh * Math.sin(t * 97), jy = 4 * sh * Math.cos(t * 83);
+  const s2 = pick && t >= P + .83 ? Math.max(0, 1 - prog(t, P + .83, .2)) : 0; jx += 5 * s2 * Math.sin(t * 101);
+  const h = pb * 50, edge = 24 / 1291 * 100;
+  bar.style.webkitMaskImage = pb >= 1 ? 'none' : `linear-gradient(90deg,transparent ${50 - h - edge}%,#000 ${50 - h}%,#000 ${50 + h}%,transparent ${50 + h + edge}%)`;
+  bar.style.webkitMaskSize = '1291px 112px'; bar.style.webkitMaskPosition = '315px 953px'; bar.style.webkitMaskRepeat = 'no-repeat';
+  if (pb >= 1) bar.style.webkitMaskImage = 'none';
+  tf(bar, { dx: jx, dy: jy + 24 * (1 - pb) });
+  tf(shadow, { a: eo(prog(t, .15, .4)), dx: jx, dy: jy });
+  const pt = eoBack(prog(t, .4, .35), 1.3); tf(tab, { dx: jx, dy: 60 * (1 - pt) + jy, a: Math.min(1, prog(t, .4, .1) * 3) });
+  [[al, as, -1, .32, 'away'], [hl, hs, 1, .40, 'home']].forEach(([lg, sp, sgn, t0, side]) => {
+    const p = prog(t, t0, .38); let s = 1.25 - .25 * eoBack(p, 1.5);
+    if (pick === side) s *= 1 + .07 * Math.sin(Math.PI * prog(t, P + .8, .45));
+    tf(lg, { dx: sgn * 300 * (1 - eoExpo(p)), s, a: eo(p * 2.5) });
+    const q = eo(prog(t, t0 + .42, .3)); tf(sp, { dx: sgn * 70 * (1 - q), a: q });
+  });
+  const pv = prog(t, .58, .16); tf(at, { s: 2.6 - 1.6 * eo(pv), a: eo(pv * 2), origin: '959.5px 1009.5px' });
+  const gp = prog(t, 1.1, .8); sweep.style.opacity = gp > 0 && gp < 1 ? 1 : 0; sweep.style.backgroundPosition = `${100 - 100 * eo(gp)}% 0`;
+  // THE PICK: the unpicked side greys from the centre out, the pick tab stamps down
+  if (grey) {
+    const pw = eo(prog(t, P + .25, .45)), edgeX = 960 + 960 * pw;
+    if (pw <= 0) grey.style.opacity = 0;
+    else {
+      grey.style.opacity = Math.min(1, pw * 20);
+      const sweepM = `linear-gradient(${E.greyRight ? 90 : 270}deg, #000 ${edgeX - 40}px, transparent ${edgeX + 40}px)`;
+      grey.style.webkitMaskImage = `url(${A}${E.greyMask}.png), ${sweepM}`; grey.style.webkitMaskComposite = 'source-in';
+      grey.style.maskComposite = 'intersect';
+    }
+  }
+  if (picktab) {
+    const ps = prog(t, P + .55, .28);
+    tf(picktab, { dx: jx, dy: -70 * (1 - eoExpo(ps)), s: 1.35 - .35 * eoBack(ps, 1.2), a: eo(ps * 3) });
+    picktab.lastChild.style.opacity = t >= P + .83 ? .7 * Math.max(0, 1 - prog(t, P + .83, .15)) : 0;
+  }
+};
+
+window.READY = (async () => {
+  await Promise.all([document.fonts.load('100px TB'), document.fonts.load('100px TS')]);
+  const c = document.createElement('canvas').getContext('2d');
+  c.font = '100px TB'; CAPB = c.measureText('H').actualBoundingBoxAscent / 100;
+  c.font = '100px TS'; CAPS = c.measureText('H').actualBoundingBoxAscent / 100;
+  K = 71.4 / CAPB / 62.5;   // the template's 62.5px spreads render 71.4px cap-high (measured off the PSD export)
+  build();
+  await Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
+  if (!window.RENDER && window.LUTC) {   // live (OBS): the PSD Color Lookup as per-channel curves (render.mjs applies the full LUT)
+    document.body.insertAdjacentHTML('beforeend', `<svg width="0" height="0" style="position:absolute"><filter id="lut" color-interpolation-filters="sRGB"><feComponentTransfer>${
+      ['R', 'G', 'B'].map(c => `<feFunc${c} type="table" tableValues="${LUTC[c.toLowerCase()].join(' ')}"/>`).join('')}</feComponentTransfer></filter></svg>`);
+    root.style.filter = 'url(#lut)';
+  }
+  seek(0);
+  if (!window.RENDER) {   // browser / OBS: loop it, or with HOLD play once and stay on the last frame
+    const t0 = performance.now(); (function loop() { const el = (performance.now() - t0) / 1000;
+      seek(window.HOLD ? Math.min(el, DURATION()) : el % (DURATION() + 1)); if (!window.HOLD || el < DURATION()) requestAnimationFrame(loop); })();
+  }
+})();
+</script></body></html>
