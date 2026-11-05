@@ -241,3 +241,21 @@ body.v-rotate.pane-picks:not(.bets) .st { overflow:hidden !important; font-size:
 .g .st > span:first-child { text-overflow:clip !important; }
 body.v-rotate.pane-studio main { grid-template-rows:minmax(0,1fr) !important; } #studio { height:100%; }
 body.v-rotate.pane-studio main { padding-bottom:2.5vh !important; }
+
+/* ---- season screen (Zach: "looks a hair funny", "make those records bigger") ---- */
+#season > #s-title, #season > #s-ladder { display:none !important; }   /* the header already says it; the ladder lives on the records screen */
+#season { gap:1.6vh !important; }
+#season .s-people .p.HTP { padding:1.4vh 3vh !important; } #season .s-people .p.HTP .big { font-size:16vh !important; }
+#season .s-people .p.HTP .nm { font-family:var(--disp) !important; font-weight:700; font-size:6.4vh !important; }
+#season .s-types { flex:1; min-height:0; } #season .s-types .ty, #season .s-types .ty.win { flex:1 1 0 !important; display:flex; flex-direction:column; justify-content:center; gap:.4vh; padding:1.2vh 2.4vh !important; }
+#season .ty .nm { font-family:var(--disp) !important; font-weight:700; font-size:4.6vh !important; letter-spacing:.2vh !important; white-space:nowrap; color:#fff !important; }
+#season .ty .big, #season .ty.win .big { font-size:14vh !important; line-height:1 !important; }
+#season .ty .sub { font-size:3.2vh !important; white-space:nowrap; }
+#season .s-more { flex:1; min-height:0; grid-template-columns:minmax(0,2.2fr) repeat(3,minmax(0,1fr)) !important; }
+#season .s-more > div { display:flex; flex-direction:column; justify-content:center; padding:1vh 2vh !important; }
+#season .s-more .nm { font-family:var(--disp) !important; font-weight:700; font-size:4vh !important; letter-spacing:.2vh !important; white-space:nowrap; color:#fff !important; }
+#season .s-more .big { font-size:10vh !important; line-height:1 !important; } #season .s-more .sub { display:none; }
+#season .wks b { font-size:4.4vh !important; } #season .wks small { font-size:2vh !important; }
+.hdr-mid { text-overflow:clip !important; } #season .s-more .nm, #season .ty .nm { overflow:hidden; min-width:0; }
+#season .wks { gap:.5vh !important; } #season .wks b { font-size:3.8vh !important; }
+#season .ty .nm, #season .s-more .nm { line-height:1.2 !important; padding-top:.3vh; overflow:visible !important; }
