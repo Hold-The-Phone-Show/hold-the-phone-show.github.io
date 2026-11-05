@@ -232,3 +232,10 @@ body.v-rotate.pane-picks:not(.bets) .tm { letter-spacing:.08vh !important; font-
 .wrap { grid-template-columns:minmax(0,1fr) !important; } header { overflow:hidden; min-width:0; }
 .hdr-mid { flex:1 1 0 !important; min-width:0 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .od .t { font-size:4.8vh !important; } .od .t img { width:4.8vh !important; height:4.8vh !important; } .od .col span { font-size:5vh !important; }
+/* game cards: the TV network never gets cut off */
+.st .net { flex-shrink:0; white-space:nowrap; } .st > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body.v-rotate.pane-picks:not(.bets) .st { overflow:visible !important; text-overflow:clip !important; }
+.g .tm, .od .t { white-space:nowrap !important; overflow:hidden !important; text-overflow:clip !important; min-width:0; }
+.st { overflow:hidden !important; }
+body.v-rotate.pane-picks:not(.bets) .st { overflow:hidden !important; font-size:2.6vh !important; gap:.8vh !important; }
+.g .st > span:first-child { text-overflow:clip !important; }
