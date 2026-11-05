@@ -16,8 +16,8 @@ html, body { width: 1920px; height: 1080px; overflow: hidden; background: transp
 .clip img { position: absolute; object-fit: contain; }
 .grad { position: absolute; left: 315px; top: 954px; width: 1291px; height: 109px; mix-blend-mode: lighten; }
 .grey { backdrop-filter: grayscale(1); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
-#picktab { position: absolute; top: 909px; height: 76px; border-radius: 9px; box-shadow: inset 0 0 0 3px #fff; overflow: hidden; }
-#picktab .fl { position: absolute; inset: 0; background: #fff; opacity: 0; }
+.picktab { position: absolute; top: 909px; height: 76px; border-radius: 9px; box-shadow: inset 0 0 0 3px #fff; overflow: hidden; }
+.picktab .fl { position: absolute; inset: 0; background: #fff; opacity: 0; }
 #sweep { position: absolute; left: 315px; top: 954px; width: 1291px; height: 109px; opacity: 0;
   background: linear-gradient(105deg, transparent 0 45%, rgba(255,255,255,.5) 50%, transparent 55% 100%); background-size: 300% 100%; mix-blend-mode: screen; }
 </style></head>
@@ -55,20 +55,20 @@ let E = {};
 function build() {
   const aw = TEAMS[CFG.away], hm = TEAMS[CFG.home], pick = CFG.pick || null;
   const shadow = img(A + 'shadow.png');
-  // THE PICK tab (behind the bar, like the PSD): picked team's color, centred over its logo, clear of the time tab
-  let picktab = null;
-  if (pick) {
-    const side = pick === 'home' ? hm : aw, cx = pick === 'home' ? 1206 : 721.5;
+  // THE PICK tabs (behind the bar, like the PSD), one per side so the pick can move without a rebuild:
+  // picked team's color, centred over its logo, clear of the time tab
+  const mkTab = (side, cx) => {
     const light = .299 * side.color[0] + .587 * side.color[1] + .114 * side.color[2] > 150;
-    picktab = el('div', '', root, { background: `rgb(${side.color.join(',')})` }); picktab.id = 'picktab';
-    const pt = txt('THE PICK', 0, 942.86 - 909, 25.4 / CAPB, 'TB', picktab, 'l', light ? '#111' : '#fff');
+    const t = el('div', 'picktab', root, { background: `rgb(${side.color.join(',')})`, opacity: 0 });
+    const pt = txt('THE PICK', 0, 942.86 - 909, 25.4 / CAPB, 'TB', t, 'l', light ? '#111' : '#fff');
     const half = pt.offsetWidth / 2 + 50;   // the PSD sizes the tab off the text layer's bounds (glyphs + ~20px each side) + 30
     let x0 = Math.round(cx - half), x1 = Math.round(cx + half), sh = 0;
     if (x1 > 786 && x0 < 816) sh = 786 - x1; else if (x0 < 1134 && x1 > 1104) sh = 1134 - x0;
     x0 += sh; x1 += sh;
-    Object.assign(picktab.style, { left: x0 + 'px', width: x1 - x0 + 'px' }); pt.style.left = (x1 - x0 - pt.offsetWidth) / 2 + 'px';
-    el('div', 'fl', picktab);
-  }
+    Object.assign(t.style, { left: x0 + 'px', width: x1 - x0 + 'px' }); pt.style.left = (x1 - x0 - pt.offsetWidth) / 2 + 'px';
+    el('div', 'fl', t); return t;
+  };
+  const tabs = { away: mkTab(aw, 721.5), home: mkTab(hm, 1206) };
   const tab = el('div', 'full'); img(A + 'center_tab.png', tab); img(A + 'betmgm.png', tab);
   const tt = txt(CFG.time.toUpperCase(), 899.57, 944.66, 23.4 / CAPS, 'TS', tab, 'c');
   if (tt.offsetWidth > 150) { tt.style.fontSize = parseFloat(tt.style.fontSize) * 150 / tt.offsetWidth + 'px'; tt.style.top = 944.66 - parseFloat(tt.style.fontSize) * CAPS + 'px'; tt.style.left = 899.57 - tt.offsetWidth / 2 + 'px'; }   // wider fallback fonts
@@ -78,23 +78,42 @@ function build() {
   const hs = txt(CFG.home_line, 1531.8, 1044.36, 62.5 * K * .965, 'TB', bar, 'r');
   const hc = el('div', 'clip', bar), hl = img(`logos/${CFG.home}.png`, hc, '');
   Object.assign(hl.style, { left: 1206 - 134 - 315 + 'px', top: 1017.5 - 111.5 - 954 + 'px', width: '268px', height: '223px' });
-  const gh = pick === 'away' ? el('div', 'full grey', bar) : null;
+  const gh = el('div', 'full grey', bar, { opacity: 0 });   // the PSD's HOME GREY OUT (shown when the pick is away)
   const ac = el('div', 'clip', bar), al = img(`logos/${CFG.away}.png`, ac, '');
   Object.assign(al.style, { left: 721.5 - 134 - 315 + 'px', top: 1004.5 - 111.5 - 954 + 'px', width: '268px', height: '223px' });
   grad(bar, aw.color, aw.dark, 80.7232, 15.1090, -10.0601, 44.1569, 'mask_away');
-  const ga = pick === 'home' ? el('div', 'full grey', bar) : null;
+  const ga = el('div', 'full grey', bar, { opacity: 0 });   // AWAY GREY OUT (pick is home)
   const as = txt(CFG.away_line, 392.8, 1045.36, 62.5 * K * .965, 'TB', bar, 'l');
   img(A + 'gloss.png', bar); const sweep = el('div', '', bar); sweep.id = 'sweep';
   const at = img(A + 'at.png', bar); img(A + 'stroke.png', bar);
-  E = { shadow, picktab, tab, bar, as, hs, al, hl, at, sweep, grey: gh || ga, greyMask: gh ? 'grey_home' : 'grey_away', greyRight: !!gh, pick };
-  if (E.grey) E.grey.style.webkitMaskImage = 'none';
+  E = { shadow, tabs, tab, bar, as, hs, al, hl, at, sweep, greys: { away: ga, home: gh }, pick };
 }
+
+// the pick look, from per-side amounts: grey[side] 0..1 = how far that side has greyed from the centre out,
+// stamp[side] 0..1 = its THE PICK tab stamping down, lift[side] 0..1 = that tab leaving, flash[side], bump[side] = logo scale
+function pickState(st, jx) {
+  for (const side of ['away', 'home']) {
+    const g = E.greys[side], pw = st.grey[side] || 0, edgeX = 960 + 960 * pw;
+    if (pw <= 0) g.style.opacity = 0;
+    else {
+      g.style.opacity = Math.min(1, pw * 20);
+      g.style.webkitMaskImage = `url(${A}grey_${side}.png), linear-gradient(${side === 'home' ? 90 : 270}deg, #000 ${edgeX - 40}px, transparent ${edgeX + 40}px)`;
+      g.style.webkitMaskComposite = 'source-in'; g.style.maskComposite = 'intersect';
+    }
+    const t = E.tabs[side], ps = st.stamp[side] || 0, lf = st.lift[side] || 0;
+    if (ps <= 0 && lf <= 0) { t.style.opacity = 0; continue; }
+    if (lf > 0) tf(t, { dx: jx, dy: -50 * eo(lf), s: 1 - .1 * eo(lf), a: 1 - eo(lf) });
+    else tf(t, { dx: jx, dy: -70 * (1 - eoExpo(ps)), s: 1.35 - .35 * eoBack(ps, 1.2), a: eo(ps * 3) });
+    t.lastChild.style.opacity = st.flash[side] || 0;
+  }
+}
+const other = s => s === 'home' ? 'away' : 'home';
 
 const P = 1.5;   // THE PICK starts once the bar has landed
 window.DURATION = () => E.pick ? P + 2.2 : 3.0;
 function tf(e, { dx = 0, dy = 0, s = 1, a = 1, origin } = {}) { e.style.transform = `translate(${dx}px,${dy}px) scale(${s})`; e.style.opacity = a; if (origin) e.style.transformOrigin = origin; }
 window.seek = function (t) {
-  const { shadow, picktab, tab, bar, as, hs, al, hl, at, sweep, grey, pick } = E;
+  const { shadow, tab, bar, as, hs, al, hl, at, sweep, pick } = E;
   // bar build: opens from the centre, tab rises from behind, logos punch in from their sides, @ slams, micro-shake
   const pb = eoExpo(prog(t, 0, .5));
   let sh = t >= .72 ? Math.max(0, 1 - prog(t, .72, .25)) : 0;
@@ -116,21 +135,32 @@ window.seek = function (t) {
   const pv = prog(t, .58, .16); tf(at, { s: 2.6 - 1.6 * eo(pv), a: eo(pv * 2), origin: '959.5px 1009.5px' });
   const gp = prog(t, 1.1, .8); sweep.style.opacity = gp > 0 && gp < 1 ? 1 : 0; sweep.style.backgroundPosition = `${100 - 100 * eo(gp)}% 0`;
   // THE PICK: the unpicked side greys from the centre out, the pick tab stamps down
-  if (grey) {
-    const pw = eo(prog(t, P + .25, .45)), edgeX = 960 + 960 * pw;
-    if (pw <= 0) grey.style.opacity = 0;
-    else {
-      grey.style.opacity = Math.min(1, pw * 20);
-      const sweepM = `linear-gradient(${E.greyRight ? 90 : 270}deg, #000 ${edgeX - 40}px, transparent ${edgeX + 40}px)`;
-      grey.style.webkitMaskImage = `url(${A}${E.greyMask}.png), ${sweepM}`; grey.style.webkitMaskComposite = 'source-in';
-      grey.style.maskComposite = 'intersect';
+  const st = { grey: {}, stamp: {}, lift: {}, flash: {} };
+  if (pick) {
+    st.grey[other(pick)] = eo(prog(t, P + .25, .45)); st.stamp[pick] = prog(t, P + .55, .28);
+    st.flash[pick] = t >= P + .83 ? .7 * Math.max(0, 1 - prog(t, P + .83, .15)) : 0;
+  }
+  pickState(st, jx);
+};
+
+// the same game with a different pick: no rebuild — the bar stays up, the grey moves across, the tab hands over
+window.repick = function (to) {
+  const from = E.pick; to = to || null; if (to === from) return; E.pick = to;
+  const t0 = performance.now();
+  (function step() {
+    const t = (performance.now() - t0) / 1000, st = { grey: {}, stamp: {}, lift: {}, flash: {} };
+    if (from) { st.grey[other(from)] = 1 - eo(prog(t, 0, .35)); st.lift[from] = prog(t, 0, .22) || 1e-6; }   // old grey recedes to the centre, old tab lifts off
+    if (to) {
+      st.grey[other(to)] = Math.max(st.grey[other(to)] || 0, eo(prog(t, .15, .45)));      // new grey sweeps out from the centre
+      st.stamp[to] = prog(t, .3, .28); st.flash[to] = t >= .58 ? .7 * Math.max(0, 1 - prog(t, .58, .15)) : 0;
     }
-  }
-  if (picktab) {
-    const ps = prog(t, P + .55, .28);
-    tf(picktab, { dx: jx, dy: -70 * (1 - eoExpo(ps)), s: 1.35 - .35 * eoBack(ps, 1.2), a: eo(ps * 3) });
-    picktab.lastChild.style.opacity = t >= P + .83 ? .7 * Math.max(0, 1 - prog(t, P + .83, .15)) : 0;
-  }
+    const jx = to && t >= .58 ? 5 * Math.max(0, 1 - prog(t, .58, .2)) * Math.sin(t * 101) : 0;
+    tf(E.bar, { dx: jx }); tf(E.tab, { dx: jx });
+    const lg = { away: E.al, home: E.hl };
+    for (const side of ['away', 'home']) tf(lg[side], { s: side === to ? 1 + .07 * Math.sin(Math.PI * prog(t, .55, .45)) : 1 });
+    pickState(st, jx);
+    if (t < 1.2) requestAnimationFrame(step);
+  })();
 };
 
 window.READY = (async () => {
