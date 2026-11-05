@@ -240,3 +240,4 @@ body.v-rotate.pane-picks:not(.bets) .st { overflow:visible !important; text-over
 body.v-rotate.pane-picks:not(.bets) .st { overflow:hidden !important; font-size:2.6vh !important; gap:.8vh !important; }
 .g .st > span:first-child { text-overflow:clip !important; }
 body.v-rotate.pane-studio main { grid-template-rows:minmax(0,1fr) !important; } #studio { height:100%; }
+body.v-rotate.pane-studio main { padding-bottom:2.5vh !important; }
