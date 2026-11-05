@@ -140,6 +140,7 @@ window.READY = (async () => {
   c.font = '100px TS'; CAPS = c.measureText('H').actualBoundingBoxAscent / 100;
   K = 71.4 / CAPB / 62.5;   // the template's 62.5px spreads render 71.4px cap-high (measured off the PSD export)
   build();
+  (window.seekCard || seek)(0);   // start state right away, so nothing shows before the animation
   await Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
   if (!window.RENDER && window.LUTC) {   // live (OBS): the PSD Color Lookup as per-channel curves (render.mjs applies the full LUT)
     document.body.insertAdjacentHTML('beforeend', `<svg width="0" height="0" style="position:absolute"><filter id="lut" color-interpolation-filters="sRGB"><feComponentTransfer>${

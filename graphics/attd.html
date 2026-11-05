@@ -89,6 +89,7 @@ window.READY = (async () => {
   await document.fonts.load('100px TB');
   const c = document.createElement('canvas').getContext('2d'); c.font = '100px TB'; CAPR = c.measureText('H').actualBoundingBoxAscent / 100;
   await build();
+  (window.seekCard || seek)(0);   // start state right away, so nothing shows before the animation
   await Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
   seek(0);
   if (!window.RENDER) {   // browser / OBS: loop it, or with HOLD play once and stay on the last frame
