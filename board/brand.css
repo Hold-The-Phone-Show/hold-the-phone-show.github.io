@@ -265,3 +265,7 @@ body.v-rotate.pane-studio main { padding-bottom:2.5vh !important; }
 .gp-stat strong { font-size:6.6vh !important; } .gp-stat span { font-size:3.8vh !important; } .gp-stat { padding:.3vh 2vh !important; }
 .gp-lines strong { font-size:5.2vh !important; } .gp-list > .gp { gap:.9vh !important; padding:1.2vh 3vh !important; }
 .mq { display:inline-block; }   /* measured before .ticking is added */
+/* 2026-11-15 live bets: % column wide enough for the 9vh number so it never runs into the bet name */
+.lb { grid-template-columns:21vh minmax(0,1fr) !important; }
+.lb .pct { white-space:nowrap !important; text-align:center !important; letter-spacing:0 !important; }
+.lb .bar { grid-column:2 !important; }
