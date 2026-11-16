@@ -109,7 +109,7 @@ window.seek = function (t) {
   if (!landed) { setT(big, { a: 0 }); setT(glint, { a: 0 }); }
   else {
     const tj = T0 + DT * (landed - 1) + 0.12, s = 1.12 - 0.12 * eo(prog(t, tj, 0.14));
-    big.textContent = glint.textContent = m ? landed + m[2] : CFG.big;
+    big.textContent = glint.textContent = CFG.count_tpl ? CFG.count_tpl.replace('{n}', landed) : (m ? landed + m[2] : CFG.big);   // count_tpl e.g. "0-{n}" for a record
     setT(big, { s }); setT(glint, { s, a: landed === n ? 1 : 0 });
     glint.style.backgroundPosition = `${100 - 100 * eo(prog(t, tj + 0.3, 0.5))}% 0`;
     if (landed === n && prog(t, tj + 0.3, 0.5) >= 1) setT(glint, { a: 0 });
